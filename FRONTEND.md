@@ -19,7 +19,7 @@ npx expo run:ios --device
 ```
 
 ElevenLabs: `EXPO_PUBLIC_ELEVENLABS_AGENT_ID` (waiting on Hasnain).  
-Custom LLM (dashboard): `https://snowboard-fact-separate-montana.trycloudflare.com/llm/chat/completions`  
+Custom LLM (dashboard): `https://frequency-remains-solely-univ.trycloudflare.com/llm/chat/completions`  
 API key env name only: `EXPO_PUBLIC_ELEVENLABS_API_KEY` (local `.env`, never commit).  
 Presage: `EXPO_PUBLIC_PRESAGE_API_KEY` in `mobile/.env`. Simulator vitals are fallback only.
 

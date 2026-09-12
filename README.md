@@ -40,14 +40,14 @@ npx expo run:ios --device     # or: npx expo run:android --device
 
 **Custom LLM (dashboard — not an env var).** Cloudflared → server `:8787`. Set this URL on the agent:
 
-`https://snowboard-fact-separate-montana.trycloudflare.com/llm/chat/completions`
+`https://frequency-remains-solely-univ.trycloudflare.com/llm/chat/completions`
 
 | Item | Value |
 |------|--------|
 | Agent name | Obsession First Date (create in ElevenLabs dashboard) |
 | `EXPO_PUBLIC_ELEVENLABS_AGENT_ID` | **empty — waiting on Hasnain** |
 | `EXPO_PUBLIC_ELEVENLABS_API_KEY` | local `mobile/.env` only — never commit |
-| Phone `EXPO_PUBLIC_API_URL` | `https://snowboard-fact-separate-montana.trycloudflare.com` (no path) |
+| Phone `EXPO_PUBLIC_API_URL` | `https://frequency-remains-solely-univ.trycloudflare.com` (no path) |
 
 Dashboard steps: Agents → your agent → **Custom LLM** → URL above (OpenAI-compatible). Phase A already serves `POST /llm/chat/completions`. Do not rewrite the server brain.
 
@@ -69,7 +69,7 @@ After prebuild, if iOS cannot import SmartSpectra: Xcode → **Add Package Depen
 ### Mobile env (`mobile/.env` — do not commit)
 
 ```
-EXPO_PUBLIC_API_URL=https://snowboard-fact-separate-montana.trycloudflare.com
+EXPO_PUBLIC_API_URL=https://frequency-remains-solely-univ.trycloudflare.com
 EXPO_PUBLIC_ELEVENLABS_AGENT_ID=
 EXPO_PUBLIC_ELEVENLABS_API_KEY=
 EXPO_PUBLIC_PRESAGE_API_KEY=
