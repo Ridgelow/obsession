@@ -1,4 +1,12 @@
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/types";
@@ -6,80 +14,201 @@ import { ObCard } from "../components/ObCard";
 import { ObButton } from "../components/ObButton";
 import { Eyebrow } from "../components/Eyebrow";
 import { colors, fonts, spacing, type, minHitSlop } from "../theme";
+import { getTimeline } from "../services/api";
+import {
+  type CoachScores,
+  type TimelineTurn,
+} from "../services/sessionHelpers";
+import { useAppState } from "../state/AppState";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Results">;
 
-const SCORES = [
-  { label: "Chemistry", value: 72, color: colors.hush },
-  { label: "Conversation", value: 65, color: "#e06a9a" },
-  { label: "Composure", value: 54, color: colors.pulse },
-  { label: "Curiosity", value: 80, color: "#d45a8c" },
+const SCORE_META: {
+  key: keyof CoachScores;
+  label: string;
+  color: string;
+}[] = [
+  { key: "chemistry", label: "Chemistry", color: colors.hush },
+  { key: "conversation", label: "Conversation", color: "#e06a9a" },
+  { key: "composure", label: "Composure", color: colors.pulse },
+  { key: "curiosity", label: "Curiosity", color: "#d45a8c" },
 ];
 
-export function ResultsScreen({ navigation }: Props) {
+export function ResultsScreen({ navigation, route }: Props) {
+  const { scenario } = useAppState();
+  const params = route.params ?? {};
+  const [scores, setScores] = useState<CoachScores | undefined>(params.scores);
+  const [keyMoment, setKeyMoment] = useState<string | undefined>(
+    params.keyMoment
+  );
+  const [coaching, setCoaching] = useState<string | undefined>(params.coaching);
+  const [turns, setTurns] = useState<TimelineTurn[]>([]);
+  const [loading, setLoading] = useState(Boolean(params.sessionId));
+  const [error, setError] = useState<string | undefined>(params.error);
+
+  useEffect(() => {
+    setScores(params.scores);
+    setKeyMoment(params.keyMoment);
+    setCoaching(params.coaching);
+    setError(params.error);
+  }, [params.coaching, params.error, params.keyMoment, params.scores]);
+
+  useEffect(() => {
+    const sid = params.sessionId;
+    if (!sid) {
+      if (!params.scores && !params.error) {
+        setError("No session results yet.");
+      }
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const timeline = await getTimeline(sid);
+        if (cancelled) return;
+        setTurns(timeline);
+        if (!params.keyMoment) {
+          const flagged = timeline.find((t) => t.flagged);
+          if (flagged?.text) {
+            setKeyMoment(flagged.text);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setError((prev) => prev ?? "Could not load timeline from the server.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [params.keyMoment, params.scores, params.sessionId]);
+
+  const flaggedIndex = useMemo(() => {
+    const idx = turns.findIndex((t) => t.flagged);
+    return idx >= 0 ? idx : turns.length > 1 ? 1 : 0;
+  }, [turns]);
+
+  const momentText =
+    keyMoment ??
+    (turns.length === 0
+      ? loading
+        ? "Loading timeline…"
+        : "No timeline turns yet — Phase A needs to log conversation turns."
+      : undefined);
+
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.kicker}>Session complete</Text>
-          <Text style={styles.title}>Your read.</Text>
-        </View>
-        <Pressable
-          onPress={() => navigation.replace("Main")}
-          hitSlop={12}
-          style={styles.doneHit}
-        >
-          <Text style={styles.done}>Done</Text>
-        </Pressable>
-      </View>
-
-      <ObCard style={styles.scores}>
-        {SCORES.map((s) => (
-          <View key={s.label} style={styles.scoreRow}>
-            <Text style={styles.scoreLabel}>{s.label}</Text>
-            <View style={styles.barTrack}>
-              <View
-                style={[
-                  styles.barFill,
-                  { width: `${s.value}%`, backgroundColor: s.color },
-                ]}
-              />
-            </View>
-            <Text style={styles.scoreValue}>{s.value}</Text>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.kicker}>Session complete</Text>
+            <Text style={styles.title}>Your read.</Text>
           </View>
-        ))}
-      </ObCard>
+          <Pressable
+            onPress={() => navigation.replace("Main")}
+            hitSlop={12}
+            style={styles.doneHit}
+          >
+            <Text style={styles.done}>Done</Text>
+          </Pressable>
+        </View>
 
-      <Eyebrow style={styles.sectionLabel}>Timeline</Eyebrow>
-      <View style={styles.timeline}>
-        <View style={styles.line} />
-        {[0.08, 0.32, 0.58, 0.88].map((left, i) => (
-          <View
-            key={i}
-            style={[
-              styles.dot,
-              { left: `${left * 100}%` },
-              i === 1 && styles.dotActive,
-            ]}
-          />
-        ))}
-      </View>
-      <Text style={styles.moment}>
-        0:42 — asked about your last relationship
-      </Text>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <ObCard style={styles.coach}>
-        <Eyebrow>Coach’s note</Eyebrow>
-        <Text style={styles.coachBody}>
-          You recovered well after the pause — but the answer trailed off. Try
-          landing on one clear sentence next time.
-        </Text>
-      </ObCard>
+        <ObCard style={styles.scores}>
+          {loading && !scores ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color={colors.pulse} />
+              <Text style={styles.loadingText}>Loading scores…</Text>
+            </View>
+          ) : scores ? (
+            SCORE_META.map((s) => {
+              const value = Math.max(0, Math.min(100, scores[s.key] ?? 0));
+              return (
+                <View key={s.key} style={styles.scoreRow}>
+                  <Text style={styles.scoreLabel}>{s.label}</Text>
+                  <View style={styles.barTrack}>
+                    <View
+                      style={[
+                        styles.barFill,
+                        { width: `${value}%`, backgroundColor: s.color },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.scoreValue}>{value}</Text>
+                </View>
+              );
+            })
+          ) : (
+            <Text style={styles.emptyCopy}>
+              Scores appear once the coach API responds. Nothing here is made
+              up.
+            </Text>
+          )}
+        </ObCard>
+
+        <Eyebrow style={styles.sectionLabel}>Timeline</Eyebrow>
+        <View style={styles.timeline}>
+          <View style={styles.line} />
+          {(turns.length > 0 ? turns : [{ flagged: false } as TimelineTurn]).map(
+            (turn, i, arr) => {
+              const left =
+                arr.length === 1 ? 0.08 : i / Math.max(arr.length - 1, 1);
+              const active = turns.length > 0 && i === flaggedIndex;
+              return (
+                <View
+                  key={`${turn.time}-${i}`}
+                  style={[
+                    styles.dot,
+                    { left: `${left * 100}%` },
+                    active && styles.dotActive,
+                  ]}
+                />
+              );
+            }
+          )}
+        </View>
+        <Text style={styles.moment}>{momentText}</Text>
+
+        {turns.filter((t) => t.text).length > 0 ? (
+          <View style={styles.turnList}>
+            {turns
+              .filter((t) => t.text)
+              .map((t, i) => (
+                <Text
+                  key={`${t.time}-row-${i}`}
+                  style={[styles.turnRow, t.flagged && styles.turnFlagged]}
+                >
+                  {t.speaker || "turn"} · {t.text}
+                </Text>
+              ))}
+          </View>
+        ) : null}
+
+        <ObCard style={styles.coach}>
+          <Eyebrow>Coach’s note</Eyebrow>
+          {loading && !coaching ? (
+            <Text style={styles.emptyCopy}>Loading coach’s note…</Text>
+          ) : (
+            <Text style={styles.coachBody}>
+              {coaching ??
+                "No coach note yet. Delivery notes will land here after a session — we won’t claim we know how you felt."}
+            </Text>
+          )}
+        </ObCard>
+      </ScrollView>
 
       <View style={styles.footer}>
         <ObButton
           label="Practice again"
-          onPress={() => navigation.replace("LiveDate")}
+          onPress={() => navigation.replace("LiveDate", { scenario })}
         />
       </View>
     </SafeAreaView>
@@ -92,6 +221,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.void,
     paddingHorizontal: spacing.lg,
   },
+  scroll: { paddingBottom: spacing.md },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -116,7 +246,30 @@ const styles = StyleSheet.create({
     fontSize: type.subhead,
     color: colors.pulse,
   },
+  error: {
+    fontFamily: fonts.body,
+    fontSize: type.footnote,
+    color: colors.pulse,
+    marginBottom: spacing.md,
+    lineHeight: 18,
+  },
   scores: { gap: spacing.md },
+  loadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  loadingText: {
+    fontFamily: fonts.body,
+    fontSize: type.footnote,
+    color: colors.muted,
+  },
+  emptyCopy: {
+    fontFamily: fonts.body,
+    fontSize: type.footnote,
+    color: colors.muted,
+    lineHeight: 18,
+  },
   scoreRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -179,8 +332,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemibold,
     fontSize: type.footnote,
     color: colors.pulse,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
+  turnList: { gap: 6, marginBottom: spacing.lg },
+  turnRow: {
+    fontFamily: fonts.body,
+    fontSize: type.caption1,
+    color: colors.muted,
+    lineHeight: 16,
+  },
+  turnFlagged: { color: colors.pulse },
   coach: { gap: spacing.md },
   coachBody: {
     fontFamily: fonts.displayItalic,
@@ -189,7 +350,6 @@ const styles = StyleSheet.create({
     color: colors.bone,
   },
   footer: {
-    marginTop: "auto",
     paddingBottom: spacing.lg,
     paddingTop: spacing.lg,
   },

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -16,6 +17,8 @@ import { ObCard } from "../components/ObCard";
 import { Eyebrow } from "../components/Eyebrow";
 import { colors, fonts, radii, spacing, type, minHitSlop } from "../theme";
 import { Scenario, useAppState } from "../state/AppState";
+import { startSession } from "../services/api";
+import { DEMO_USER_ID, mapScenario } from "../services/sessionHelpers";
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Practice">,
@@ -25,7 +28,68 @@ type Props = CompositeScreenProps<
 const SCENARIOS: Scenario[] = ["First Date", "Coffee Chat", "Silence"];
 
 export function HomeScreen({ navigation }: Props) {
-  const { sessionCount, scenario, setScenario, lastMemory } = useAppState();
+  const {
+    sessionCount,
+    scenario,
+    setScenario,
+    lastMemory,
+    setLastMemory,
+    pendingSessionId,
+    setPendingSessionId,
+    recallNonce,
+  } = useAppState();
+  const [starting, setStarting] = useState(false);
+  const pendingRef = useRef<string | null>(pendingSessionId);
+  const requestGen = useRef(0);
+
+  useEffect(() => {
+    pendingRef.current = pendingSessionId;
+  }, [pendingSessionId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const gen = ++requestGen.current;
+    (async () => {
+      try {
+        const res = await startSession(DEMO_USER_ID, mapScenario(scenario));
+        if (cancelled || gen !== requestGen.current) return;
+        pendingRef.current = res.sessionId;
+        setPendingSessionId(res.sessionId);
+        if (res.priorPatterns) setLastMemory(res.priorPatterns);
+      } catch {
+        // Phase A may be down — keep the last card copy.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [scenario, recallNonce, setLastMemory, setPendingSessionId]);
+
+  const onBegin = async () => {
+    if (starting) return;
+    setStarting(true);
+    requestGen.current += 1;
+    try {
+      let sessionId: string | undefined = pendingRef.current ?? undefined;
+      if (!sessionId) {
+        try {
+          const res = await startSession(DEMO_USER_ID, mapScenario(scenario));
+          sessionId = res.sessionId;
+          if (res.priorPatterns) setLastMemory(res.priorPatterns);
+        } catch {
+          sessionId = undefined;
+        }
+      }
+      setPendingSessionId(null);
+      pendingRef.current = null;
+      navigation.navigate("LiveDate", {
+        sessionId,
+        scenario,
+      });
+    } finally {
+      setStarting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -48,10 +112,12 @@ export function HomeScreen({ navigation }: Props) {
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => navigation.navigate("LiveDate")}
+          onPress={onBegin}
+          disabled={starting}
           style={({ pressed }) => [
             styles.beginBlock,
             pressed && { opacity: 0.9 },
+            starting && { opacity: 0.7 },
           ]}
         >
           <View style={styles.playOrb}>
@@ -59,7 +125,9 @@ export function HomeScreen({ navigation }: Props) {
           </View>
           <Text style={styles.beginTitle}>Begin a practice date</Text>
           <Text style={styles.beginSub}>
-            2–3 minutes · we’ll tell you how it went
+            {starting
+              ? "Starting session…"
+              : "2–3 minutes · we’ll tell you how it went"}
           </Text>
         </Pressable>
 

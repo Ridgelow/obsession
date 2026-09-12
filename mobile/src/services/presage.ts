@@ -1,5 +1,5 @@
 // Presage SmartSpectra — native iOS/Android SDK (no official RN package yet).
-// Until the bridge lands, LiveDateScreen runs a vitals simulator.
+// Prefer the vitals simulator for demo reliability. Native is an optional stub.
 
 export type VitalsReading = {
   heartRate: number;
@@ -7,8 +7,16 @@ export type VitalsReading = {
   engagement?: number;
 };
 
+export type VitalsSource = {
+  tick(): VitalsReading;
+  reset(): void;
+};
+
+/** Keep simulator first. Flip only if a native bridge is actually installed. */
+export const PREFER_SIMULATOR = true;
+
 /** Demo simulator: climbs from baseline toward a nerve spike. */
-export function createVitalsSimulator(baseline = 71) {
+export function createVitalsSimulator(baseline = 71): VitalsSource {
   let t = 0;
   return {
     tick(): VitalsReading {
@@ -23,6 +31,29 @@ export function createVitalsSimulator(baseline = 71) {
       t = 0;
     },
   };
+}
+
+/** Optional native stub — do not call in the demo path. */
+export function createNativePresageStub(): VitalsSource {
+  return {
+    tick(): VitalsReading {
+      throw new Error(
+        "Presage native bridge not wired — use createVitalsSimulator()."
+      );
+    },
+    reset() {},
+  };
+}
+
+/** Demo entry: always the simulator unless native is explicitly opted in. */
+export function createVitalsSource(
+  baseline = 71,
+  opts?: { native?: boolean }
+): VitalsSource {
+  if (opts?.native && !PREFER_SIMULATOR) {
+    return createNativePresageStub();
+  }
+  return createVitalsSimulator(baseline);
 }
 
 export async function submitClipForAnalysis(
