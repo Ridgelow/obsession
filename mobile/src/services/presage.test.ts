@@ -19,7 +19,7 @@ function run(): void {
     "missing key hint"
   );
   assert(
-    vitalsFallbackHint("native_unavailable")?.includes("dev client"),
+    vitalsFallbackHint("native_unavailable")?.includes("simulated"),
     "native hint"
   );
   assert(vitalsFallbackHint(null) === null, "no hint when live");

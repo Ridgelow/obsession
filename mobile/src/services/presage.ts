@@ -114,7 +114,9 @@ export async function openVitalsSource(): Promise<LiveVitals> {
         }
       },
     };
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("[vitals] Presage camera start failed:", msg);
     return wrapSimulator("native_failed");
   }
 }

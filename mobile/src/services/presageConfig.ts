@@ -29,11 +29,11 @@ export function isPresageConfigured(): boolean {
 export function vitalsFallbackHint(reason: VitalsFallbackReason): string | null {
   switch (reason) {
     case "missing_key":
-      return "Camera HR waits on EXPO_PUBLIC_PRESAGE_API_KEY.";
+      return "Demo HR — add EXPO_PUBLIC_PRESAGE_API_KEY for camera vitals.";
     case "native_unavailable":
-      return "Camera HR needs a prebuild / dev client — using simulator.";
+      return "Demo HR (simulated) — camera vitals need SmartSpectra linked.";
     case "native_failed":
-      return "Camera HR failed to start — using simulator.";
+      return "Demo HR (simulated) — camera vitals unavailable this build.";
     default:
       return null;
   }

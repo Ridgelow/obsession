@@ -24,21 +24,21 @@ export type { VerificationHandlers, VerifiedRecord } from "./personaConfig";
 
 import {
   PERSONA_DEV_CLIENT_HINT,
-  isPersonaConfigured,
+  shouldUsePersonaMock,
   startMockVerification,
   type VerificationHandlers,
 } from "./personaConfig";
 
 /**
  * Start 18+ verification.
- * - Template id missing → honest mock (Onboarding labels this).
- * - Template id set on web / Expo Go / CI → do **not** mock; error with the
- *   dev-client hint. Native builds use persona.native.ts.
+ * - Mock when USE_MOCK / missing / non-itmpl_ (Onboarding labels this).
+ * - Valid itmpl_ on web / Expo Go → error with dev-client hint.
+ * - Native builds use persona.native.ts.
  */
 export async function startVerification(
   handlers: VerificationHandlers
 ): Promise<void> {
-  if (!isPersonaConfigured()) {
+  if (shouldUsePersonaMock()) {
     await startMockVerification(handlers);
     return;
   }

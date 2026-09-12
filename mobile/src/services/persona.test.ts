@@ -9,6 +9,7 @@ import {
   personaEnvironmentName,
   personaTemplateId,
   serializeVerifiedRecord,
+  shouldUsePersonaMock,
   startMockVerification,
 } from "./personaConfig";
 import { startVerification } from "./persona";
@@ -19,14 +20,14 @@ function assert(cond: unknown, message: string): void {
 
 async function run(): Promise<void> {
   const prev = process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID;
+  const prevMock = process.env.EXPO_PUBLIC_PERSONA_USE_MOCK;
+  delete process.env.EXPO_PUBLIC_PERSONA_USE_MOCK;
 
   process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID = "";
   assert(isPersonaConfigured() === false, "empty template is not configured");
   assert(personaTemplateId() === "", "empty template trims to empty");
-  assert(
-    mockFallbackLabel()?.includes("EXPO_PUBLIC_PERSONA_TEMPLATE_ID"),
-    "mock label only when unconfigured"
-  );
+  assert(shouldUsePersonaMock() === true, "mock when unconfigured");
+  assert(mockFallbackLabel() != null, "mock label when unconfigured");
 
   process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID =
     "  persona_sandbox_2ccdba5e-08cd-4e47-965f-a59133988bb0  ";
@@ -42,10 +43,17 @@ async function run(): Promise<void> {
     "persona_sandbox_ uuid is not an itmpl_ token"
   );
   assert(isPersonaTemplateToken("itmpl_abc") === true, "itmpl_ token");
-  assert(mockFallbackLabel() === null, "no mock label when configured");
+  assert(shouldUsePersonaMock() === true, "non-itmpl_ uses mock");
+  assert(mockFallbackLabel() != null, "mock label for non-itmpl_ placeholder");
 
   process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID = "itmpl_live_prod";
   assert(personaEnvironmentName() === "production", "prod when not sandbox");
+  assert(shouldUsePersonaMock() === false, "valid itmpl_ is live path");
+  assert(mockFallbackLabel() === null, "no mock label for live itmpl_");
+
+  process.env.EXPO_PUBLIC_PERSONA_USE_MOCK = "1";
+  assert(shouldUsePersonaMock() === true, "force mock overrides itmpl_");
+  delete process.env.EXPO_PUBLIC_PERSONA_USE_MOCK;
 
   assert(isVerifiedStatus("completed") === true, "completed verifies");
   assert(isVerifiedStatus("APPROVED") === true, "approved verifies");
@@ -95,10 +103,25 @@ async function run(): Promise<void> {
       throw new Error("unconfigured path should mock, not error");
     },
   });
-  assert(unlocked === PERSONA_MOCK_INQUIRY_ID, "startVerification mocks only when id missing");
+  assert(unlocked === PERSONA_MOCK_INQUIRY_ID, "startVerification mocks when id missing");
 
   process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID =
     "persona_sandbox_2ccdba5e-08cd-4e47-965f-a59133988bb0";
+  unlocked = "";
+  await startVerification({
+    onVerified: (id) => {
+      unlocked = id;
+    },
+    onCanceled: () => {
+      throw new Error("non-itmpl_ should mock");
+    },
+    onError: () => {
+      throw new Error("non-itmpl_ should mock, not error");
+    },
+  });
+  assert(unlocked === PERSONA_MOCK_INQUIRY_ID, "non-itmpl_ placeholder uses mock");
+
+  process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID = "itmpl_for_dev_client";
   let err = "";
   let verifiedFromCi = false;
   await startVerification({
@@ -110,11 +133,13 @@ async function run(): Promise<void> {
       err = message;
     },
   });
-  assert(verifiedFromCi === false, "CI/web never fake-verifies when template id is set");
-  assert(err === PERSONA_DEV_CLIENT_HINT, "configured non-native path asks for a dev client");
+  assert(verifiedFromCi === false, "CI/web never fake-verifies for live itmpl_");
+  assert(err === PERSONA_DEV_CLIENT_HINT, "live itmpl_ on non-native asks for a dev client");
 
   if (prev === undefined) delete process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID;
   else process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID = prev;
+  if (prevMock === undefined) delete process.env.EXPO_PUBLIC_PERSONA_USE_MOCK;
+  else process.env.EXPO_PUBLIC_PERSONA_USE_MOCK = prevMock;
 
   console.log("persona tests passed");
 }

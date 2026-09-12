@@ -17,6 +17,7 @@ export type DateConversation = {
   isSpeaking: boolean;
   status: DateConversationStatus;
   lastAgentLine: string | null;
+  lastUserLine: string | null;
   configured: boolean;
 };
 
@@ -50,27 +51,51 @@ export function mapVoiceStatus(status: string): DateConversationStatus {
   return "disconnected";
 }
 
-/**
- * Pull a spoken agent line from an ElevenLabs onMessage payload.
- * Returns null for user speech or empty content — never invents a line.
- */
-export function extractAgentSpokenLine(payload: unknown): string | null {
-  if (payload == null) return null;
-  if (typeof payload === "string") return null;
-  if (typeof payload !== "object") return null;
-  const p = payload as Record<string, unknown>;
-  const role = String(p.role ?? "").toLowerCase();
-  const source = String(p.source ?? "").toLowerCase();
-  const isAgent =
-    role === "agent" ||
-    source === "ai" ||
-    source === "agent" ||
-    source === "assistant";
-  if (!isAgent) return null;
-  const text = p.message;
+function messageTextFromPayload(payload: Record<string, unknown>): string | null {
+  let text: unknown = payload.message ?? payload.text ?? payload.content;
+  if (text && typeof text === "object") {
+    const nested = text as Record<string, unknown>;
+    text = nested.message ?? nested.text ?? nested.content;
+  }
   if (typeof text !== "string") return null;
   const trimmed = text.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function roleFromPayload(payload: Record<string, unknown>): "agent" | "user" | null {
+  const role = String(payload.role ?? "").toLowerCase();
+  const source = String(payload.source ?? "").toLowerCase();
+  if (
+    role === "agent" ||
+    role === "ai" ||
+    role === "assistant" ||
+    source === "ai" ||
+    source === "agent" ||
+    source === "assistant"
+  ) {
+    return "agent";
+  }
+  if (role === "user" || source === "user") return "user";
+  return null;
+}
+
+/**
+ * Pull a spoken agent line from an ElevenLabs onMessage payload.
+ * Handles both `{ role, message }` and `{ source, message }` shapes.
+ */
+export function extractAgentSpokenLine(payload: unknown): string | null {
+  if (payload == null || typeof payload !== "object") return null;
+  const p = payload as Record<string, unknown>;
+  if (roleFromPayload(p) !== "agent") return null;
+  return messageTextFromPayload(p);
+}
+
+/** Pull a spoken user (mic) transcript line from an onMessage payload. */
+export function extractUserSpokenLine(payload: unknown): string | null {
+  if (payload == null || typeof payload !== "object") return null;
+  const p = payload as Record<string, unknown>;
+  if (roleFromPayload(p) !== "user") return null;
+  return messageTextFromPayload(p);
 }
 
 export const STUB_CONVERSATION: DateConversation = {
@@ -79,5 +104,6 @@ export const STUB_CONVERSATION: DateConversation = {
   isSpeaking: false,
   status: "disconnected",
   lastAgentLine: null,
+  lastUserLine: null,
   configured: false,
 };

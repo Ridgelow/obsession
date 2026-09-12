@@ -11,6 +11,7 @@ import {
   asyncRoute,
   extractMessageText,
   resolveSessionId,
+  sanitizePriorPatterns,
 } from "../util.js";
 
 export const llmWebhookRouter = Router();
@@ -70,7 +71,7 @@ async function handleChatCompletions(req, res) {
     const session = await getSession(sessionId);
     if (session) {
       scenario = session.scenario || "first_date";
-      priorPatterns = session.prior_patterns || null;
+      priorPatterns = sanitizePriorPatterns(session.prior_patterns);
       const latest = await getLatestTelemetry(sessionId);
       const baseline = session.hr_baseline;
       if (latest?.heart_rate != null && baseline != null) {

@@ -15,7 +15,7 @@ export const PERSONA_DEV_CLIENT_HINT =
 export const PERSONA_MOCK_INQUIRY_ID = "inq_mock_unconfigured";
 
 export const PERSONA_MOCK_LABEL =
-  "Demo mock — EXPO_PUBLIC_PERSONA_TEMPLATE_ID is not set. Not a real Persona inquiry.";
+  "Demo mock — not a real Persona inquiry. Set EXPO_PUBLIC_PERSONA_USE_MOCK=0 and an itmpl_ id for live verify.";
 
 export type VerificationHandlers = {
   onVerified: (inquiryId: string) => void;
@@ -34,6 +34,12 @@ export function personaTemplateId(): string {
   return (process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID ?? "").trim();
 }
 
+/** Force the labeled demo mock (hackathon / bad template id). */
+export function isPersonaMockForced(): boolean {
+  const raw = (process.env.EXPO_PUBLIC_PERSONA_USE_MOCK ?? "").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
 export function isPersonaConfigured(): boolean {
   return personaTemplateId().length > 0;
 }
@@ -41,6 +47,13 @@ export function isPersonaConfigured(): boolean {
 /** Persona Inquiry.fromTemplate only accepts tokens that start with `itmpl_`. */
 export function isPersonaTemplateToken(templateId = personaTemplateId()): boolean {
   return templateId.startsWith("itmpl_");
+}
+
+/** Use mock when forced, missing template, or non-itmpl_ placeholder in env. */
+export function shouldUsePersonaMock(): boolean {
+  if (isPersonaMockForced()) return true;
+  if (!isPersonaConfigured()) return true;
+  return !isPersonaTemplateToken();
 }
 
 /** Sandbox template ids include "sandbox"; otherwise production. */
@@ -90,8 +103,8 @@ export function parseVerifiedRecord(raw: string | null | undefined): VerifiedRec
   return { verified: false };
 }
 
-export function mockFallbackLabel(configured = isPersonaConfigured()): string | null {
-  return configured ? null : PERSONA_MOCK_LABEL;
+export function mockFallbackLabel(): string | null {
+  return shouldUsePersonaMock() ? PERSONA_MOCK_LABEL : null;
 }
 
 /** Honest mock — only when the template id is missing. Never label this as live Persona. */

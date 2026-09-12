@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "crypto";
 import { getSession, insertSession, updateSession } from "../db.js";
 import { recallPatterns } from "../backboard.js";
-import { asyncRoute, httpError, normalizeScenario } from "../util.js";
+import { asyncRoute, httpError, normalizeScenario, sanitizePriorPatterns } from "../util.js";
 
 export const sessionRouter = Router();
 
@@ -21,10 +21,9 @@ sessionRouter.post(
       const recall = await recallPatterns(
         "Summarize in one sentence what this person tends to struggle with on practice dates. If you remember nothing, reply with an empty string."
       );
-      const text = recall?.message?.trim();
-      patterns = text || null;
+      patterns = sanitizePriorPatterns(recall?.message);
     } catch (err) {
-      // Backboard has no memory yet for a first-ever session — that's fine.
+      // Backboard has no memory yet / billing limits — keep Home on fallback copy.
       console.warn("[session] Backboard recall skipped:", err.message);
     }
 

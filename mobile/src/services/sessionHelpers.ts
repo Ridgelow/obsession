@@ -4,6 +4,57 @@ export const DEMO_USER_ID = "demo-user";
 export const TELEMETRY_INTERVAL_MS = 1000;
 export const AI_LINE_POLL_MS = 3000;
 
+/** Local scripted date lines when voice/timeline aren't ready yet. */
+export const DEMO_DATE_LINES: { atSec: number; text: string }[] = [
+  { atSec: 2, text: "Hey — thanks for meeting me. How’s your week been?" },
+  {
+    atSec: 12,
+    text: "So… why did your last relationship end?",
+  },
+  {
+    atSec: 28,
+    text: "Oh, I definitely hit a nerve there.",
+  },
+];
+
+export function demoLineAt(seconds: number): string | null {
+  let line: string | null = null;
+  for (const beat of DEMO_DATE_LINES) {
+    if (seconds >= beat.atSec) line = beat.text;
+  }
+  return line;
+}
+
+/**
+ * Drop Backboard billing / product errors so they never show on Home.
+ */
+export function sanitizePriorPatterns(text: unknown): string | null {
+  if (text == null) return null;
+  const trimmed = String(text).trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLowerCase();
+  const rejectHints = [
+    "free credit",
+    "add credits",
+    "billing page",
+    "auto-reload",
+    "memory & rag",
+    "subscription",
+    "can't cover llm",
+    "cannot cover llm",
+    "top up",
+    "insufficient",
+    "rate limit",
+    "unauthorized",
+  ];
+  if (rejectHints.some((h) => lower.includes(h))) return null;
+  if (trimmed.length > 280) return `${trimmed.slice(0, 277)}…`;
+  return trimmed;
+}
+
+export const FALLBACK_LAST_MEMORY =
+  "You tensed up on relationship questions — let’s revisit that tonight.";
+
 export type CoachScores = {
   chemistry: number;
   conversation: number;

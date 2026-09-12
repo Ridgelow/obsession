@@ -61,6 +61,34 @@ export function resolveSessionId(body = {}) {
   );
 }
 
+/**
+ * Backboard sometimes returns billing/RAG product copy instead of a memory.
+ * Never surface that on the Home "last session" card or into Gemini.
+ */
+export function sanitizePriorPatterns(text) {
+  if (text == null) return null;
+  const trimmed = String(text).trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLowerCase();
+  const rejectHints = [
+    "free credit",
+    "add credits",
+    "billing page",
+    "auto-reload",
+    "memory & rag",
+    "subscription",
+    "can't cover llm",
+    "cannot cover llm",
+    "top up",
+    "insufficient",
+    "rate limit",
+    "unauthorized",
+  ];
+  if (rejectHints.some((h) => lower.includes(h))) return null;
+  if (trimmed.length > 280) return `${trimmed.slice(0, 277)}…`;
+  return trimmed;
+}
+
 export function parseJsonLoose(text) {
   if (text == null) throw new Error("empty JSON");
   if (typeof text === "object") return text;

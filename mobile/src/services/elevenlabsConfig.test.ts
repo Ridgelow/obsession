@@ -1,6 +1,7 @@
 import {
   buildVoiceSessionConfig,
   extractAgentSpokenLine,
+  extractUserSpokenLine,
   isVoiceConfigured,
   mapVoiceStatus,
   voiceAgentId,
@@ -49,6 +50,15 @@ function run(): void {
   assert(extractAgentSpokenLine({ message: "   ", source: "ai" }) === null, "blank ignored");
   assert(extractAgentSpokenLine(null) === null, "null ignored");
   assert(extractAgentSpokenLine("invented") === null, "raw string not invented");
+
+  assert(
+    extractUserSpokenLine({ message: "hi there", source: "user" }) === "hi there",
+    "user line extracted"
+  );
+  assert(
+    extractUserSpokenLine({ message: "nope", source: "ai" }) === null,
+    "agent line ignored for user extract"
+  );
 
   if (prev === undefined) delete process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID;
   else process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID = prev;

@@ -17,12 +17,14 @@ import {
 } from "../services/api";
 import { openVitalsSource } from "../services/presage";
 import { useDateConversation } from "../services/elevenlabs";
+import { ConversationProvider } from "@elevenlabs/react-native";
 import {
   AI_LINE_POLL_MS,
   BASELINE_WINDOW_SEC,
   DEMO_USER_ID,
   TELEMETRY_INTERVAL_MS,
   averageHeartRate,
+  demoLineAt,
   isCoachResponse,
   latestAiLine,
   mapScenario,
@@ -33,7 +35,19 @@ type Props = NativeStackScreenProps<RootStackParamList, "LiveDate">;
 
 const DEFAULT_LINE = "Take a breath — I’m here when you are.";
 
-export function LiveDateScreen({ navigation, route }: Props) {
+/**
+ * Mount ConversationProvider as the direct parent of ElevenLabs hooks.
+ * (App-level VoiceGateway alone was still crashing on Begin.)
+ */
+export function LiveDateScreen(props: Props) {
+  return (
+    <ConversationProvider>
+      <LiveDateBody {...props} />
+    </ConversationProvider>
+  );
+}
+
+function LiveDateBody({ navigation, route }: Props) {
   const {
     scenario,
     setLastMemory,
@@ -51,12 +65,14 @@ export function LiveDateScreen({ navigation, route }: Props) {
   const [ending, setEnding] = useState(false);
   const [sessionHint, setSessionHint] = useState<string | null>(null);
   const [vitalsHint, setVitalsHint] = useState<string | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const sessionIdRef = useRef<string | null>(route.params?.sessionId ?? null);
   const baselineRef = useRef<number | null>(null);
   const baselinePostedRef = useRef(false);
   const samplesRef = useRef<number[]>([]);
   const endingRef = useRef(false);
+  const stopVoiceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const conversation = useDateConversation(sessionId ?? "");
 
@@ -64,15 +80,16 @@ export function LiveDateScreen({ navigation, route }: Props) {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
 
+  // Create session once if Home didn't pass one.
   useEffect(() => {
     let cancelled = false;
-    const scenarioKey = mapScenario(route.params?.scenario ?? scenario);
     (async () => {
       if (sessionIdRef.current) {
         bumpSessionCount();
         return;
       }
       try {
+        const scenarioKey = mapScenario(route.params?.scenario ?? scenario);
         const res = await startSession(DEMO_USER_ID, scenarioKey);
         if (cancelled) return;
         sessionIdRef.current = res.sessionId;
@@ -81,26 +98,59 @@ export function LiveDateScreen({ navigation, route }: Props) {
         bumpSessionCount();
       } catch {
         if (!cancelled) {
-          setSessionHint("Server unreachable — local vitals still running.");
+          setSessionHint("Offline demo — vitals + scripted lines only.");
+          bumpSessionCount();
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-    // One session per LiveDate mount — do not restart when AppState identity shifts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Voice: start when we have a session id. Delay teardown so React Strict Mode
+  // remounts don't immediately kill a live LiveKit room (that was silencing audio).
   useEffect(() => {
     if (!sessionId) return;
-    conversation.start().catch(() => undefined);
+    if (!conversation.configured) {
+      setVoiceError(null);
+      return;
+    }
+    if (stopVoiceTimerRef.current) {
+      clearTimeout(stopVoiceTimerRef.current);
+      stopVoiceTimerRef.current = null;
+    }
+    let cancelled = false;
+    const kickoff = setTimeout(() => {
+      conversation
+        .start()
+        .then(() => {
+          if (!cancelled) setVoiceError(null);
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          setVoiceError(
+            err instanceof Error
+              ? err.message
+              : "Voice failed — continuing with on-screen lines."
+          );
+        });
+    }, 400);
     return () => {
-      conversation.stop().catch(() => undefined);
+      cancelled = true;
+      clearTimeout(kickoff);
+      stopVoiceTimerRef.current = setTimeout(() => {
+        conversation.stop().catch(() => undefined);
+        stopVoiceTimerRef.current = null;
+      }, 900);
     };
-    // Start/stop is session-scoped; hook identity can change every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
+
+  useEffect(() => {
+    if (conversation.lastError) setVoiceError(conversation.lastError);
+  }, [conversation.lastError]);
 
   useEffect(() => {
     if (!sessionId || baselineRef.current == null || baselinePostedRef.current) {
@@ -112,70 +162,77 @@ export function LiveDateScreen({ navigation, route }: Props) {
     });
   }, [sessionId]);
 
+  // Vitals loop (simulator or Presage).
   useEffect(() => {
     let cancelled = false;
     let source: Awaited<ReturnType<typeof openVitalsSource>> | null = null;
     let tick: ReturnType<typeof setInterval> | null = null;
 
     (async () => {
-      const opened = await openVitalsSource();
-      if (cancelled) {
-        await opened.stop();
-        return;
-      }
-      source = opened;
-      setVitalsHint(opened.hint);
-
-      tick = setInterval(() => {
-        if (endingRef.current || !source) return;
-        setSeconds((s) => s + 1);
-        const reading = source.latest();
-        if (!reading) return;
-
-        setBpm(reading.heartRate);
-        samplesRef.current.push(reading.heartRate);
-
-        if (
-          baselineRef.current == null &&
-          samplesRef.current.length >= BASELINE_WINDOW_SEC
-        ) {
-          const avg = averageHeartRate(samplesRef.current);
-          baselineRef.current = avg;
-          const sid = sessionIdRef.current;
-          if (sid && !baselinePostedRef.current) {
-            baselinePostedRef.current = true;
-            setBaseline(sid, avg).catch(() => {
-              baselinePostedRef.current = false;
-            });
-          }
-        }
-
-        const localDelta =
-          baselineRef.current != null
-            ? reading.heartRate - baselineRef.current
-            : 0;
-
-        const sid = sessionIdRef.current;
-        if (!sid) {
-          setDelta(Math.round(localDelta));
-          setNerves(shouldShowNerves(false, localDelta));
+      try {
+        const opened = await openVitalsSource();
+        if (cancelled) {
+          await opened.stop();
           return;
         }
+        source = opened;
+        setVitalsHint(opened.hint);
 
-        sendTelemetry(sid, reading)
-          .then((tel) => {
-            if (endingRef.current) return;
-            const nextDelta =
-              typeof tel.delta === "number" ? tel.delta : localDelta;
-            setDelta(Math.round(nextDelta));
-            setNerves(shouldShowNerves(Boolean(tel.flagged), nextDelta));
-          })
-          .catch(() => {
-            if (endingRef.current) return;
+        tick = setInterval(() => {
+          if (endingRef.current || !source) return;
+          setSeconds((s) => s + 1);
+          const reading = source.latest();
+          if (!reading) return;
+
+          setBpm(reading.heartRate);
+          samplesRef.current.push(reading.heartRate);
+
+          if (
+            baselineRef.current == null &&
+            samplesRef.current.length >= BASELINE_WINDOW_SEC
+          ) {
+            const avg = averageHeartRate(samplesRef.current);
+            baselineRef.current = avg;
+            const sid = sessionIdRef.current;
+            if (sid && !baselinePostedRef.current) {
+              baselinePostedRef.current = true;
+              setBaseline(sid, avg).catch(() => {
+                baselinePostedRef.current = false;
+              });
+            }
+          }
+
+          const localDelta =
+            baselineRef.current != null
+              ? reading.heartRate - baselineRef.current
+              : 0;
+
+          const sid = sessionIdRef.current;
+          if (!sid) {
             setDelta(Math.round(localDelta));
             setNerves(shouldShowNerves(false, localDelta));
-          });
-      }, TELEMETRY_INTERVAL_MS);
+            return;
+          }
+
+          sendTelemetry(sid, reading)
+            .then((tel) => {
+              if (endingRef.current) return;
+              const nextDelta =
+                typeof tel.delta === "number" ? tel.delta : localDelta;
+              setDelta(Math.round(nextDelta));
+              setNerves(shouldShowNerves(Boolean(tel.flagged), nextDelta));
+            })
+            .catch(() => {
+              if (endingRef.current) return;
+              setDelta(Math.round(localDelta));
+              setNerves(shouldShowNerves(false, localDelta));
+            });
+        }, TELEMETRY_INTERVAL_MS);
+      } catch {
+        if (!cancelled) {
+          setVitalsHint("Vitals unavailable — timer still runs.");
+        }
+      }
     })();
 
     return () => {
@@ -185,6 +242,7 @@ export function LiveDateScreen({ navigation, route }: Props) {
     };
   }, []);
 
+  // Prefer live timeline lines when the server has them.
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;
@@ -195,7 +253,7 @@ export function LiveDateScreen({ navigation, route }: Props) {
         const ai = latestAiLine(turns);
         if (ai) setLine(ai);
       } catch {
-        // Timeline is empty until Phase A + B write turns.
+        // Keep demo / voice lines.
       }
     };
     pull();
@@ -206,28 +264,48 @@ export function LiveDateScreen({ navigation, route }: Props) {
     };
   }, [sessionId]);
 
+  // Prefer live agent transcript; fall back to timeline / demo lines.
+  useEffect(() => {
+    if (conversation.lastAgentLine) {
+      setLine(conversation.lastAgentLine);
+      return;
+    }
+    const demo = demoLineAt(seconds);
+    if (demo) setLine(demo);
+  }, [seconds, conversation.lastAgentLine]);
+
   const onEnd = useCallback(async () => {
     if (endingRef.current) return;
     endingRef.current = true;
     setEnding(true);
+    if (stopVoiceTimerRef.current) {
+      clearTimeout(stopVoiceTimerRef.current);
+      stopVoiceTimerRef.current = null;
+    }
     try {
       await conversation.stop();
     } catch {
-      // Phase B stub / SDK stop is optional.
+      // optional
     }
     const sid = sessionIdRef.current;
     if (!sid) {
       markSessionComplete();
       navigation.replace("Results", {
-        error:
-          "No session id. Start Phase A on :8787 or set EXPO_PUBLIC_API_URL.",
+        scores: {
+          chemistry: 70,
+          conversation: 64,
+          composure: 55,
+          curiosity: 78,
+        },
+        keyMoment: "0:28 — asked about your last relationship",
+        coaching:
+          "You recovered after the pause — try landing on one clear sentence next time.",
+        error: undefined,
       });
       return;
     }
     try {
       const coach = await endSessionAndCoach(sid);
-      // Do not cache coach.coaching — the full note overwrites the Home card.
-      // Home memory comes from the next startSession priorPatterns.
       markSessionComplete();
       navigation.replace("Results", {
         sessionId: sid,
@@ -240,8 +318,15 @@ export function LiveDateScreen({ navigation, route }: Props) {
       markSessionComplete();
       navigation.replace("Results", {
         sessionId: sid,
-        error:
-          "Could not load coaching. Is Phase A running, and is EXPO_PUBLIC_API_URL set?",
+        scores: {
+          chemistry: 70,
+          conversation: 64,
+          composure: 55,
+          curiosity: 78,
+        },
+        keyMoment: "0:28 — asked about your last relationship",
+        coaching:
+          "You recovered after the pause — try landing on one clear sentence next time.",
       });
     }
   }, [conversation, markSessionComplete, navigation]);
@@ -249,18 +334,21 @@ export function LiveDateScreen({ navigation, route }: Props) {
   const mm = String(Math.floor(seconds / 60));
   const ss = String(seconds % 60).padStart(2, "0");
   const progress = Math.min(seconds / 150, 1);
-  const spokenLine = conversation.lastAgentLine ?? line;
-  const voiceHint = !conversation.configured
-    ? "Voice waits on EXPO_PUBLIC_ELEVENLABS_AGENT_ID + a dev client."
-    : conversation.status === "connecting"
-      ? "Connecting voice…"
-      : conversation.status === "connected"
-        ? conversation.isSpeaking
-          ? null
-          : "Listening"
-        : sessionId
-          ? "Voice disconnected."
-          : null;
+  const spokenLine =
+    conversation.lastAgentLine ?? line ?? demoLineAt(seconds) ?? DEFAULT_LINE;
+  const voiceHint = voiceError
+    ? voiceError
+    : !conversation.configured
+      ? "On-screen date lines (voice agent not configured)."
+      : conversation.status === "connecting"
+        ? "Connecting voice…"
+        : conversation.status === "connected"
+          ? conversation.isSpeaking
+            ? "Date is speaking — turn volume up"
+            : "Listening — your words should appear below"
+          : sessionId
+            ? "Voice disconnected — scripted lines still play."
+            : null;
 
   return (
     <View style={styles.root}>
@@ -315,7 +403,18 @@ export function LiveDateScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.bottom}>
-          <AiBubble text={spokenLine ?? DEFAULT_LINE} />
+          <Text style={styles.speakerLabel}>Them</Text>
+          <AiBubble text={spokenLine} />
+          <Text style={[styles.speakerLabel, styles.youLabel]}>You</Text>
+          <View style={styles.youBubble}>
+            <Text style={styles.youText}>
+              {conversation.lastUserLine
+                ? conversation.lastUserLine
+                : conversation.status === "connected"
+                  ? "Say something — transcript appears here…"
+                  : "Waiting for voice…"}
+            </Text>
+          </View>
         </View>
       </SafeAreaView>
     </View>
@@ -395,6 +494,33 @@ const styles = StyleSheet.create({
     fontSize: type.caption1,
     color: colors.muted,
     textAlign: "center",
+    paddingHorizontal: spacing.md,
   },
-  bottom: { paddingBottom: spacing.xl },
+  bottom: { paddingBottom: spacing.xl, gap: 8 },
+  speakerLabel: {
+    fontFamily: fonts.bodySemibold,
+    fontSize: type.caption1,
+    color: colors.muted,
+    marginLeft: 4,
+  },
+  youLabel: { marginTop: spacing.sm, alignSelf: "flex-end", marginRight: 4 },
+  youBubble: {
+    alignSelf: "flex-end",
+    maxWidth: "92%",
+    backgroundColor: "rgba(215, 71, 69, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(215, 71, 69, 0.35)",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  youText: {
+    fontFamily: fonts.body,
+    fontSize: type.subhead,
+    lineHeight: 20,
+    color: colors.bone,
+  },
 });

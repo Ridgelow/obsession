@@ -5,6 +5,7 @@ export {
   STUB_CONVERSATION,
   buildVoiceSessionConfig,
   extractAgentSpokenLine,
+  extractUserSpokenLine,
   isVoiceConfigured,
   mapVoiceStatus,
   voiceAgentId,
@@ -19,6 +20,8 @@ export type {
 import { STUB_CONVERSATION, type DateConversation } from "./elevenlabsConfig";
 
 /** Stub until a native dev client loads elevenlabs.native.ts. */
-export function useDateConversation(_sessionId: string): DateConversation {
-  return STUB_CONVERSATION;
+export function useDateConversation(_sessionId: string): DateConversation & {
+  lastError: string | null;
+} {
+  return { ...STUB_CONVERSATION, lastError: null };
 }

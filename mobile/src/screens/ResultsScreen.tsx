@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -35,7 +35,7 @@ const SCORE_META: {
 ];
 
 export function ResultsScreen({ navigation, route }: Props) {
-  const { scenario } = useAppState();
+  const { scenario, addHistoryEntry } = useAppState();
   const params = route.params ?? {};
   const [scores, setScores] = useState<CoachScores | undefined>(params.scores);
   const [keyMoment, setKeyMoment] = useState<string | undefined>(
@@ -45,6 +45,7 @@ export function ResultsScreen({ navigation, route }: Props) {
   const [turns, setTurns] = useState<TimelineTurn[]>([]);
   const [loading, setLoading] = useState(Boolean(params.sessionId));
   const [error, setError] = useState<string | undefined>(params.error);
+  const savedRef = useRef(false);
 
   useEffect(() => {
     setScores(params.scores);
@@ -86,6 +87,26 @@ export function ResultsScreen({ navigation, route }: Props) {
       cancelled = true;
     };
   }, [params.keyMoment, params.scores, params.sessionId]);
+
+  useEffect(() => {
+    if (savedRef.current) return;
+    if (!scores && !keyMoment && !coaching && !params.sessionId) return;
+    savedRef.current = true;
+    addHistoryEntry({
+      sessionId: params.sessionId,
+      scenario: scenario || "Practice date",
+      scores,
+      keyMoment,
+      coaching,
+    });
+  }, [
+    addHistoryEntry,
+    coaching,
+    keyMoment,
+    params.sessionId,
+    scenario,
+    scores,
+  ]);
 
   const flaggedIndex = useMemo(() => {
     const idx = turns.findIndex((t) => t.flagged);

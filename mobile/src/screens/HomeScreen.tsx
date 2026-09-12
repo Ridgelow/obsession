@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import { Eyebrow } from "../components/Eyebrow";
 import { colors, fonts, radii, spacing, type, minHitSlop } from "../theme";
 import { Scenario, useAppState } from "../state/AppState";
 import { startSession } from "../services/api";
-import { DEMO_USER_ID, mapScenario } from "../services/sessionHelpers";
+import { DEMO_USER_ID, mapScenario, sanitizePriorPatterns } from "../services/sessionHelpers";
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Practice">,
@@ -34,59 +34,31 @@ export function HomeScreen({ navigation }: Props) {
     setScenario,
     lastMemory,
     setLastMemory,
-    pendingSessionId,
-    setPendingSessionId,
-    recallNonce,
   } = useAppState();
   const [starting, setStarting] = useState(false);
-  const pendingRef = useRef<string | null>(pendingSessionId);
-  const requestGen = useRef(0);
-
-  useEffect(() => {
-    pendingRef.current = pendingSessionId;
-  }, [pendingSessionId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const gen = ++requestGen.current;
-    (async () => {
-      try {
-        const res = await startSession(DEMO_USER_ID, mapScenario(scenario));
-        if (cancelled || gen !== requestGen.current) return;
-        pendingRef.current = res.sessionId;
-        setPendingSessionId(res.sessionId);
-        if (res.priorPatterns) setLastMemory(res.priorPatterns);
-      } catch {
-        // Phase A may be down — keep the last card copy.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [scenario, recallNonce, setLastMemory, setPendingSessionId]);
+  const startingRef = useRef(false);
 
   const onBegin = async () => {
-    if (starting) return;
+    if (startingRef.current) return;
+    startingRef.current = true;
     setStarting(true);
-    requestGen.current += 1;
     try {
-      let sessionId: string | undefined = pendingRef.current ?? undefined;
-      if (!sessionId) {
-        try {
-          const res = await startSession(DEMO_USER_ID, mapScenario(scenario));
-          sessionId = res.sessionId;
-          if (res.priorPatterns) setLastMemory(res.priorPatterns);
-        } catch {
-          sessionId = undefined;
-        }
+      let sessionId: string | undefined;
+      try {
+        const res = await startSession(DEMO_USER_ID, mapScenario(scenario));
+        sessionId = res.sessionId;
+        const memory = sanitizePriorPatterns(res.priorPatterns);
+        if (memory) setLastMemory(memory);
+      } catch {
+        // Offline / server down — LiveDate runs scripted demo.
+        sessionId = undefined;
       }
-      setPendingSessionId(null);
-      pendingRef.current = null;
       navigation.navigate("LiveDate", {
         sessionId,
         scenario,
       });
     } finally {
+      startingRef.current = false;
       setStarting(false);
     }
   };

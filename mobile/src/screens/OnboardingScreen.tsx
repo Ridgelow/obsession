@@ -9,11 +9,7 @@ import { ObCard } from "../components/ObCard";
 import { ObButton } from "../components/ObButton";
 import { colors, fonts, spacing, type } from "../theme";
 import { useAppState } from "../state/AppState";
-import {
-  isPersonaConfigured,
-  mockFallbackLabel,
-  startVerification,
-} from "../services/persona";
+import { mockFallbackLabel, startVerification } from "../services/persona";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Onboarding">;
 
@@ -22,7 +18,7 @@ export function OnboardingScreen({ navigation }: Props) {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mockLabel = mockFallbackLabel();
-  const configured = isPersonaConfigured();
+  const usingMock = Boolean(mockLabel);
 
   const onVerify = () => {
     setVerifying(true);
@@ -72,12 +68,12 @@ export function OnboardingScreen({ navigation }: Props) {
           <ObButton
             label={
               verifying
-                ? configured
-                  ? "Opening Persona…"
-                  : "Verifying…"
-                : configured
-                  ? "Verify with Persona"
-                  : "Verify (demo mock)"
+                ? usingMock
+                  ? "Verifying…"
+                  : "Opening Persona…"
+                : usingMock
+                  ? "Verify (demo mock)"
+                  : "Verify with Persona"
             }
             variant="outline"
             onPress={onVerify}
