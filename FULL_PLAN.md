@@ -228,7 +228,7 @@ When `[SIGNAL: …]` appears: notice lightly, adapt — **never** “I know you�
 
 **Coaching:** JSON only; coach **delivery and answer craft** for the spiked moment; no emotion certainty claims.
 
-Model: `gemini-2.5-flash` (already in `gemini.js`).
+Model: `gemini-3.6-flash` (already in `gemini.js`).
 
 Scenarios = different system prompts (First Date / Coffee Chat / Silence).
 

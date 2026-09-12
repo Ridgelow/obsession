@@ -20,7 +20,7 @@ Keys to put in `server/.env` (see `.env.example`):
 
 | Variable | Required for | Notes |
 |---|---|---|
-| `GEMINI_API_KEY` | live date lines + coaching | model `gemini-2.5-flash` |
+| `GEMINI_API_KEY` | live date lines + coaching | model `gemini-3.6-flash` |
 | `TIGER_DATA_URL` | durable sessions / hypertables | run `db/schema.sql` once on Tiger Cloud |
 | `BACKBOARD_API_KEY` | Home “from last session” | optional; start/coach degrade if missing |
 | `BACKBOARD_ASSISTANT_ID` | same | assistant-scoped memory |

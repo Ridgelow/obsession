@@ -5,17 +5,25 @@ import { hasTigerUrl } from "./config.js";
 // When TIGER_DATA_URL is unset we keep an in-memory store so the server
 // still boots and curl smoke tests are reviewable without secrets.
 
-const connectionString = process.env.TIGER_DATA_URL;
-const remote =
-  Boolean(connectionString) &&
-  !/localhost|127\.0\.0\.1/i.test(connectionString);
+function tigerConnection() {
+  const raw = process.env.TIGER_DATA_URL;
+  if (!raw) return null;
+  // pg treats sslmode=require as verify-full; Tiger uses a chain that
+  // fails verify. Strip sslmode and force rejectUnauthorized:false.
+  const connectionString = raw
+    .replace(/[?&]sslmode=[^&]*/gi, "")
+    .replace(/[?&]$/, "")
+    .replace(/\?&/, "?");
+  const remote = !/localhost|127\.0\.0\.1/i.test(connectionString);
+  return {
+    connectionString,
+    ssl: remote ? { rejectUnauthorized: false } : undefined,
+  };
+}
 
-export const pool = connectionString
-  ? new pg.Pool({
-      connectionString,
-      ssl: remote ? { rejectUnauthorized: false } : undefined,
-    })
-  : null;
+const tiger = tigerConnection();
+
+export const pool = tiger ? new pg.Pool(tiger) : null;
 
 export const dbMode = pool ? "tiger" : "memory";
 
