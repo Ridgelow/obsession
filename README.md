@@ -38,7 +38,7 @@ npx expo run:ios --device     # or: npx expo run:android --device
 
 ### ElevenLabs Agent (Hasnain)
 
-**Custom LLM (dashboard — not an env var).** Cloudflared → server `:8787`. Set this URL on the agent:
+**Custom LLM (dashboard — not an env var).** Cloudflared → server `:8787` (verified `/health`). Set this URL on the agent:
 
 `https://frequency-remains-solely-univ.trycloudflare.com/llm/chat/completions`
 
