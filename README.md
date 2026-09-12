@@ -38,22 +38,20 @@ npx expo run:ios --device     # or: npx expo run:android --device
 
 ### ElevenLabs Agent (Hasnain)
 
+**Custom LLM (dashboard — not an env var).** Cloudflared → server `:8787`. Set this URL on the agent:
+
+`https://snowboard-fact-separate-montana.trycloudflare.com/llm/chat/completions`
+
 | Item | Value |
 |------|--------|
-| Agent name | Obsession First Date |
-| `EXPO_PUBLIC_ELEVENLABS_AGENT_ID` | `agent_4801m2bbx00he4krmxrfdvyt4x2k` |
-| Custom LLM URL (dashboard) | `https://origin-governments-vancouver-commitment.trycloudflare.com/llm/chat/completions` |
+| Agent name | Obsession First Date (create in ElevenLabs dashboard) |
+| `EXPO_PUBLIC_ELEVENLABS_AGENT_ID` | **empty — waiting on Hasnain** |
+| `EXPO_PUBLIC_ELEVENLABS_API_KEY` | local `mobile/.env` only — never commit |
+| Phone `EXPO_PUBLIC_API_URL` | `https://snowboard-fact-separate-montana.trycloudflare.com` (no path) |
 
-Do **not** use `agent_6201m2bbxk6wesyvtmdymm2z9s0t`.
+Dashboard steps: Agents → your agent → **Custom LLM** → URL above (OpenAI-compatible). Phase A already serves `POST /llm/chat/completions`. Do not rewrite the server brain.
 
-Create / confirm the agent in the ElevenLabs dashboard, set **Custom LLM** to that Cloudflare URL (OpenAI-compatible). LiveDate starts the agent with:
-
-- `dynamicVariables.session_id`
-- `customLlmExtraBody.sessionId` (SDK field → `custom_llm_extra_body` / `elevenlabs_extra_body`)
-
-Phase A already resolves either field on `POST /llm/chat/completions`. Do not rewrite the server brain.
-
-If `EXPO_PUBLIC_ELEVENLABS_AGENT_ID` is empty, LiveDate still mounts; voice start is a no-op.
+LiveDate starts the agent with `dynamicVariables.session_id` and `customLlmExtraBody.sessionId`. If `EXPO_PUBLIC_ELEVENLABS_AGENT_ID` is empty, LiveDate still mounts; voice start is a no-op.
 
 ### Presage / SmartSpectra (real camera)
 
@@ -71,12 +69,13 @@ After prebuild, if iOS cannot import SmartSpectra: Xcode → **Add Package Depen
 ### Mobile env (`mobile/.env` — do not commit)
 
 ```
-EXPO_PUBLIC_API_URL=http://localhost:8787
-EXPO_PUBLIC_ELEVENLABS_AGENT_ID=agent_4801m2bbx00he4krmxrfdvyt4x2k
+EXPO_PUBLIC_API_URL=https://snowboard-fact-separate-montana.trycloudflare.com
+EXPO_PUBLIC_ELEVENLABS_AGENT_ID=
+EXPO_PUBLIC_ELEVENLABS_API_KEY=
 EXPO_PUBLIC_PRESAGE_API_KEY=
 ```
 
-Physical phone talking to the tunneled server: set `EXPO_PUBLIC_API_URL` to `https://origin-governments-vancouver-commitment.trycloudflare.com` (no `/llm` path).
+Do not commit `mobile/.env`. Agent id stays empty until Hasnain pastes it.
 
 ## Stack
 

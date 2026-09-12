@@ -46,7 +46,7 @@ ngrok http 8787
 # Agent Custom LLM URL must be exactly:
 #   https://<public-host>/llm/chat/completions
 # Current demo tunnel (Hasnain's Obsession First Date agent):
-#   https://origin-governments-vancouver-commitment.trycloudflare.com/llm/chat/completions
+#   https://snowboard-fact-separate-montana.trycloudflare.com/llm/chat/completions
 ```
 
 ## Phase A curl smoke tests

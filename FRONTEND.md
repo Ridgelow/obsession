@@ -18,8 +18,9 @@ npx expo prebuild --clean
 npx expo run:ios --device
 ```
 
-ElevenLabs agent: `EXPO_PUBLIC_ELEVENLABS_AGENT_ID=agent_4801m2bbx00he4krmxrfdvyt4x2k`  
-Custom LLM (dashboard): `https://origin-governments-vancouver-commitment.trycloudflare.com/llm/chat/completions`  
+ElevenLabs: `EXPO_PUBLIC_ELEVENLABS_AGENT_ID` (waiting on Hasnain).  
+Custom LLM (dashboard): `https://snowboard-fact-separate-montana.trycloudflare.com/llm/chat/completions`  
+API key env name only: `EXPO_PUBLIC_ELEVENLABS_API_KEY` (local `.env`, never commit).  
 Presage: `EXPO_PUBLIC_PRESAGE_API_KEY` in `mobile/.env`. Simulator vitals are fallback only.
 
 ## Sprint order
@@ -50,7 +51,7 @@ Presage: `EXPO_PUBLIC_PRESAGE_API_KEY` in `mobile/.env`. Simulator vitals are fa
 |------|------|------------|
 | Persona | `src/services/persona.ts` | Dev client + template ID |
 | Session create | `src/services/api.ts` | Express server up |
-| ElevenLabs | `src/services/elevenlabs.ts` + `.native.ts` | Agent `agent_4801m2bbx00he4krmxrfdvyt4x2k` + Custom LLM URL |
+| ElevenLabs | `src/services/elevenlabs.ts` + `.native.ts` | Agent id env + Custom LLM URL (Hasnain) |
 | Presage camera | `src/services/presage.ts` + `modules/smart-spectra` | Real HR; simulator only if native/key fails |
 | Results fetch | `api.ts` coaching/timeline | Tiger data from a real session |
 

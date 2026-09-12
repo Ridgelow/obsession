@@ -21,16 +21,12 @@ function run(): void {
   assert(isVoiceConfigured() === false, "empty agent id is not configured");
   assert(voiceAgentId() === "", "empty agent id trims to empty");
 
-  process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID =
-    "  agent_4801m2bbx00he4krmxrfdvyt4x2k  ";
-  assert(isVoiceConfigured() === true, "Hasnain agent id is configured");
-  assert(
-    voiceAgentId() === "agent_4801m2bbx00he4krmxrfdvyt4x2k",
-    "Hasnain agent id trims"
-  );
+  process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID = "  agent_test  ";
+  assert(isVoiceConfigured() === true, "agent id is configured");
+  assert(voiceAgentId() === "agent_test", "agent id trims");
 
   const cfg = buildVoiceSessionConfig("sess-123");
-  assert(cfg.agentId === "agent_4801m2bbx00he4krmxrfdvyt4x2k", "agentId from env");
+  assert(cfg.agentId === "agent_test", "agentId from env");
   assert(cfg.dynamicVariables.session_id === "sess-123", "session_id dynamic var");
   assert(cfg.customLlmExtraBody.sessionId === "sess-123", "sessionId extra body");
 
