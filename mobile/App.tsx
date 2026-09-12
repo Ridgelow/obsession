@@ -14,6 +14,7 @@ import {
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppProvider } from "./src/state/AppState";
 import { RootNavigator } from "./src/navigation/RootNavigator";
+import { VoiceGateway } from "./src/services/voiceGateway";
 import { colors } from "./src/theme";
 
 const navTheme = {
@@ -54,12 +55,14 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AppProvider>
-        <NavigationContainer theme={navTheme}>
-          <StatusBar style="light" />
-          <RootNavigator />
-        </NavigationContainer>
-      </AppProvider>
+      <VoiceGateway>
+        <AppProvider>
+          <NavigationContainer theme={navTheme}>
+            <StatusBar style="light" />
+            <RootNavigator />
+          </NavigationContainer>
+        </AppProvider>
+      </VoiceGateway>
     </SafeAreaProvider>
   );
 }

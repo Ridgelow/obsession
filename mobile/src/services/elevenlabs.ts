@@ -1,19 +1,24 @@
-// ElevenLabs Agent — install @elevenlabs/react-native (+ LiveKit) for real voice.
-// Docs: https://elevenlabs.io/docs/agents-platform/guides/integrations/expo-react-native
+// Default / web / tests: compile-safe stub.
+// Native Metro resolves elevenlabs.native.ts (ConversationProvider + SDK).
 
-export type DateConversation = {
-  start: () => Promise<void>;
-  stop: () => Promise<void>;
-  isSpeaking: boolean;
-  status: "connected" | "connecting" | "disconnected";
-};
+export {
+  STUB_CONVERSATION,
+  buildVoiceSessionConfig,
+  extractAgentSpokenLine,
+  isVoiceConfigured,
+  mapVoiceStatus,
+  voiceAgentId,
+} from "./elevenlabsConfig";
 
-/** Stub until native SDK is installed. LiveDate uses on-screen transcript for now. */
+export type {
+  DateConversation,
+  DateConversationStatus,
+  VoiceSessionConfig,
+} from "./elevenlabsConfig";
+
+import { STUB_CONVERSATION, type DateConversation } from "./elevenlabsConfig";
+
+/** Stub until a native dev client loads elevenlabs.native.ts. */
 export function useDateConversation(_sessionId: string): DateConversation {
-  return {
-    start: async () => undefined,
-    stop: async () => undefined,
-    isSpeaking: false,
-    status: "disconnected",
-  };
+  return STUB_CONVERSATION;
 }

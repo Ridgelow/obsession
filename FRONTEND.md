@@ -9,7 +9,18 @@ cd mobile
 npm start
 ```
 
-Then open iOS Simulator, Android emulator, or Expo Go (Persona/Presage need a **dev client** later — UI works in Expo Go now).
+Then open iOS Simulator, Android emulator, or Expo Go for UI-only work.
+
+**Phase B (voice + camera HR) is not Expo Go.** Use a prebuild / EAS dev client:
+
+```bash
+npx expo prebuild --clean
+npx expo run:ios --device
+```
+
+ElevenLabs agent: `EXPO_PUBLIC_ELEVENLABS_AGENT_ID=agent_4801m2bbx00he4krmxrfdvyt4x2k`  
+Custom LLM (dashboard): `https://origin-governments-vancouver-commitment.trycloudflare.com/llm/chat/completions`  
+Presage: `EXPO_PUBLIC_PRESAGE_API_KEY` in `mobile/.env`. Simulator vitals are fallback only.
 
 ## Sprint order
 
@@ -39,8 +50,8 @@ Then open iOS Simulator, Android emulator, or Expo Go (Persona/Presage need a **
 |------|------|------------|
 | Persona | `src/services/persona.ts` | Dev client + template ID |
 | Session create | `src/services/api.ts` | Express server up |
-| ElevenLabs | `src/services/elevenlabs.ts` | Agent + ngrok Custom LLM |
-| Presage / simulator | `src/services/presage.ts` | Telemetry POST |
+| ElevenLabs | `src/services/elevenlabs.ts` + `.native.ts` | Agent `agent_4801m2bbx00he4krmxrfdvyt4x2k` + Custom LLM URL |
+| Presage camera | `src/services/presage.ts` + `modules/smart-spectra` | Real HR; simulator only if native/key fails |
 | Results fetch | `api.ts` coaching/timeline | Tiger data from a real session |
 
 ### FE-4 — Demo hardening

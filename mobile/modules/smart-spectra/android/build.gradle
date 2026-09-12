@@ -1,0 +1,26 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.obsession'
+version = '1.0.0'
+
+android {
+  namespace "com.obsession.smartspectra"
+  defaultConfig {
+    minSdk 28
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+repositories {
+  google()
+  mavenCentral()
+}
+
+dependencies {
+  implementation "com.presagetech:smartspectra:3.3.0"
+  implementation "androidx.camera:camera-view:1.6.0"
+}
