@@ -9,18 +9,40 @@ import { ObCard } from "../components/ObCard";
 import { ObButton } from "../components/ObButton";
 import { colors, fonts, spacing, type } from "../theme";
 import { useAppState } from "../state/AppState";
+import {
+  isPersonaConfigured,
+  mockFallbackLabel,
+  startVerification,
+} from "../services/persona";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Onboarding">;
 
 export function OnboardingScreen({ navigation }: Props) {
   const { verified, setVerified } = useAppState();
   const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const mockLabel = mockFallbackLabel();
+  const configured = isPersonaConfigured();
 
-  const onVerify = async () => {
+  const onVerify = () => {
     setVerifying(true);
-    await new Promise((r) => setTimeout(r, 600));
-    setVerified(true);
-    setVerifying(false);
+    setError(null);
+    void startVerification({
+      onVerified: (inquiryId) => {
+        setVerified(true, inquiryId);
+        setVerifying(false);
+      },
+      onCanceled: () => {
+        setVerifying(false);
+      },
+      onError: (message) => {
+        setError(message);
+        setVerifying(false);
+      },
+    }).catch((err: unknown) => {
+      setError(err instanceof Error ? err.message : "Verification failed");
+      setVerifying(false);
+    });
   };
 
   return (
@@ -44,16 +66,28 @@ export function OnboardingScreen({ navigation }: Props) {
             <Text style={styles.cardTitle}>One quick check.</Text>
           </View>
           <Text style={styles.cardBody}>
-            We confirm you’re a real person with Persona before your first
-            practice date — about 20 seconds, and your data stays private.
+            We confirm you’re 18+ with Persona before your first practice
+            date — about 20 seconds, and your data stays private.
           </Text>
           <ObButton
-            label={verifying ? "Verifying…" : "Verify with Persona"}
+            label={
+              verifying
+                ? configured
+                  ? "Opening Persona…"
+                  : "Verifying…"
+                : configured
+                  ? "Verify with Persona"
+                  : "Verify (demo mock)"
+            }
             variant="outline"
             onPress={onVerify}
             disabled={verifying || verified}
             style={styles.verifyBtn}
           />
+          {mockLabel && !verified ? (
+            <Text style={styles.mockLabel}>{mockLabel}</Text>
+          ) : null}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
           {verified ? (
             <View style={styles.verifiedRow}>
               <Ionicons name="checkmark" size={16} color={colors.pulse} />
@@ -121,6 +155,18 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   verifyBtn: { marginTop: spacing.sm },
+  mockLabel: {
+    fontFamily: fonts.body,
+    fontSize: type.caption1,
+    lineHeight: 16,
+    color: colors.muted,
+  },
+  errorText: {
+    fontFamily: fonts.body,
+    fontSize: type.footnote,
+    lineHeight: 18,
+    color: colors.pulse,
+  },
   verifiedRow: {
     flexDirection: "row",
     alignItems: "center",

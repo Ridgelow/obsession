@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
 import { NavigationContainer, DarkTheme } from "@react-navigation/native";
@@ -15,6 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppProvider } from "./src/state/AppState";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { VoiceGateway } from "./src/services/voiceGateway";
+import { loadVerified } from "./src/services/verifiedStorage";
 import { colors } from "./src/theme";
 
 const navTheme = {
@@ -37,8 +39,26 @@ export default function App() {
     Manrope_500Medium,
     Manrope_700Bold,
   });
+  const [boot, setBoot] = useState<{ ready: boolean; verified: boolean }>({
+    ready: false,
+    verified: false,
+  });
 
-  if (!loaded) {
+  useEffect(() => {
+    let cancelled = false;
+    loadVerified()
+      .then((record) => {
+        if (!cancelled) setBoot({ ready: true, verified: record.verified });
+      })
+      .catch(() => {
+        if (!cancelled) setBoot({ ready: true, verified: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!loaded || !boot.ready) {
     return (
       <View
         style={{
@@ -56,7 +76,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <VoiceGateway>
-        <AppProvider>
+        <AppProvider initialVerified={boot.verified}>
           <NavigationContainer theme={navTheme}>
             <StatusBar style="light" />
             <RootNavigator />

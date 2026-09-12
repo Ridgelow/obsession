@@ -54,7 +54,8 @@ obsession/
 - Components: Wordmark, ObCard, ObButton, Eyebrow, NerveTag, AiBubble  
 - Screens: Onboarding, Home, LiveDate (vitals **simulator**), Results, History stub, Profile stub  
 - Nav: Onboarding → Main tabs (Practice/History/Profile) → LiveDate → Results  
-- Service **stubs**: `persona.ts`, `elevenlabs.ts`, `presage.ts`, `api.ts` (typed, not fully wired to UI)
+- Service **stubs**: `elevenlabs.ts`, `presage.ts`, `api.ts` (typed, not fully wired to UI)  
+- Persona 18+: `persona.ts` / `persona.native.ts` + `plugins/withPersona.js` + AsyncStorage (dev client, not Expo Go)
 
 ### Not done (functionality — cook these)
 - Boot Express with real env keys  
@@ -63,7 +64,6 @@ obsession/
 - ElevenLabs Agent + Custom LLM → webhook  
 - LiveDate posts telemetry + starts voice session  
 - Results fetches coaching/timeline from API  
-- Real Persona SDK  
 - Optional Presage native; **keep simulator as fallback**  
 - Backboard recall/write end-to-end  
 - Demo script + Devpost video assets  
@@ -301,7 +301,7 @@ Scenarios = different system prompts (First Date / Coffee Chat / Silence).
 2. Backboard save on coach; recall on next start → Home card  
 
 ### Phase E — Persona
-1. Real SDK on Onboarding  
+1. Real SDK on Onboarding — `react-native-persona` + `plugins/withPersona.js` + **dev client** (not Expo Go). Template: `EXPO_PUBLIC_PERSONA_TEMPLATE_ID=persona_sandbox_2ccdba5e-08cd-4e47-965f-a59133988bb0` (18+). Continue only after verified; persist in AsyncStorage. Mock is labeled and used only when the template id is missing.  
 2. Theme inquiry if dashboard allows  
 
 ### Phase F — Demo lock
