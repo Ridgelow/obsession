@@ -15,7 +15,7 @@ import {
   setBaseline,
   startSession,
 } from "../services/api";
-import { createVitalsSimulator } from "../services/presage";
+import { openVitalsSource } from "../services/presage";
 import { useDateConversation } from "../services/elevenlabs";
 import {
   AI_LINE_POLL_MS,
@@ -44,12 +44,13 @@ export function LiveDateScreen({ navigation, route }: Props) {
     route.params?.sessionId ?? null
   );
   const [seconds, setSeconds] = useState(0);
-  const [bpm, setBpm] = useState(71);
+  const [bpm, setBpm] = useState<number | null>(null);
   const [delta, setDelta] = useState(0);
   const [nerves, setNerves] = useState(false);
   const [line, setLine] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
   const [sessionHint, setSessionHint] = useState<string | null>(null);
+  const [vitalsHint, setVitalsHint] = useState<string | null>(null);
 
   const sessionIdRef = useRef<string | null>(route.params?.sessionId ?? null);
   const baselineRef = useRef<number | null>(null);
@@ -97,7 +98,7 @@ export function LiveDateScreen({ navigation, route }: Props) {
     return () => {
       conversation.stop().catch(() => undefined);
     };
-    // Stub hook is stable; sessionId is the real dependency.
+    // Start/stop is session-scoped; hook identity can change every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
@@ -112,59 +113,75 @@ export function LiveDateScreen({ navigation, route }: Props) {
   }, [sessionId]);
 
   useEffect(() => {
-    const sim = createVitalsSimulator();
-    const tick = setInterval(() => {
-      if (endingRef.current) return;
-      const reading = sim.tick();
-      setBpm(reading.heartRate);
-      setSeconds((s) => s + 1);
-      samplesRef.current.push(reading.heartRate);
+    let cancelled = false;
+    let source: Awaited<ReturnType<typeof openVitalsSource>> | null = null;
+    let tick: ReturnType<typeof setInterval> | null = null;
 
-      if (
-        baselineRef.current == null &&
-        samplesRef.current.length >= BASELINE_WINDOW_SEC
-      ) {
-        const avg = averageHeartRate(samplesRef.current);
-        baselineRef.current = avg;
-        const sid = sessionIdRef.current;
-        if (sid && !baselinePostedRef.current) {
-          baselinePostedRef.current = true;
-          setBaseline(sid, avg).catch(() => {
-            baselinePostedRef.current = false;
-          });
-        }
-      }
-
-      const localDelta =
-        baselineRef.current != null
-          ? reading.heartRate - baselineRef.current
-          : 0;
-
-      const sid = sessionIdRef.current;
-      if (!sid) {
-        setDelta(Math.round(localDelta));
-        setNerves(shouldShowNerves(false, localDelta));
+    (async () => {
+      const opened = await openVitalsSource();
+      if (cancelled) {
+        await opened.stop();
         return;
       }
+      source = opened;
+      setVitalsHint(opened.hint);
 
-      sendTelemetry(sid, { ...reading, source: "simulator" })
-        .then((tel) => {
-          if (endingRef.current) return;
-          const nextDelta =
-            typeof tel.delta === "number" ? tel.delta : localDelta;
-          setDelta(Math.round(nextDelta));
-          setNerves(shouldShowNerves(Boolean(tel.flagged), nextDelta));
-        })
-        .catch(() => {
-          if (endingRef.current) return;
+      tick = setInterval(() => {
+        if (endingRef.current || !source) return;
+        setSeconds((s) => s + 1);
+        const reading = source.latest();
+        if (!reading) return;
+
+        setBpm(reading.heartRate);
+        samplesRef.current.push(reading.heartRate);
+
+        if (
+          baselineRef.current == null &&
+          samplesRef.current.length >= BASELINE_WINDOW_SEC
+        ) {
+          const avg = averageHeartRate(samplesRef.current);
+          baselineRef.current = avg;
+          const sid = sessionIdRef.current;
+          if (sid && !baselinePostedRef.current) {
+            baselinePostedRef.current = true;
+            setBaseline(sid, avg).catch(() => {
+              baselinePostedRef.current = false;
+            });
+          }
+        }
+
+        const localDelta =
+          baselineRef.current != null
+            ? reading.heartRate - baselineRef.current
+            : 0;
+
+        const sid = sessionIdRef.current;
+        if (!sid) {
           setDelta(Math.round(localDelta));
           setNerves(shouldShowNerves(false, localDelta));
-        });
-    }, TELEMETRY_INTERVAL_MS);
+          return;
+        }
+
+        sendTelemetry(sid, reading)
+          .then((tel) => {
+            if (endingRef.current) return;
+            const nextDelta =
+              typeof tel.delta === "number" ? tel.delta : localDelta;
+            setDelta(Math.round(nextDelta));
+            setNerves(shouldShowNerves(Boolean(tel.flagged), nextDelta));
+          })
+          .catch(() => {
+            if (endingRef.current) return;
+            setDelta(Math.round(localDelta));
+            setNerves(shouldShowNerves(false, localDelta));
+          });
+      }, TELEMETRY_INTERVAL_MS);
+    })();
 
     return () => {
-      clearInterval(tick);
-      sim.reset();
+      cancelled = true;
+      if (tick) clearInterval(tick);
+      source?.stop();
     };
   }, []);
 
@@ -232,6 +249,18 @@ export function LiveDateScreen({ navigation, route }: Props) {
   const mm = String(Math.floor(seconds / 60));
   const ss = String(seconds % 60).padStart(2, "0");
   const progress = Math.min(seconds / 150, 1);
+  const spokenLine = conversation.lastAgentLine ?? line;
+  const voiceHint = !conversation.configured
+    ? "Voice waits on EXPO_PUBLIC_ELEVENLABS_AGENT_ID + a dev client."
+    : conversation.status === "connecting"
+      ? "Connecting voice…"
+      : conversation.status === "connected"
+        ? conversation.isSpeaking
+          ? null
+          : "Listening"
+        : sessionId
+          ? "Voice disconnected."
+          : null;
 
   return (
     <View style={styles.root}>
@@ -262,13 +291,15 @@ export function LiveDateScreen({ navigation, route }: Props) {
           <View style={styles.endHit} />
         </View>
 
-        {nerves ? (
+        {nerves && bpm != null ? (
           <View style={styles.tagWrap}>
             <NerveTag bpm={bpm} delta={delta} />
           </View>
         ) : (
           <View style={styles.tagWrap}>
-            <Text style={styles.quietHr}>{bpm} BPM</Text>
+            <Text style={styles.quietHr}>
+              {bpm != null ? `${bpm} BPM` : "HR…"}
+            </Text>
           </View>
         )}
 
@@ -279,10 +310,12 @@ export function LiveDateScreen({ navigation, route }: Props) {
           {sessionHint ? (
             <Text style={styles.hint}>{sessionHint}</Text>
           ) : null}
+          {voiceHint ? <Text style={styles.hint}>{voiceHint}</Text> : null}
+          {vitalsHint ? <Text style={styles.hint}>{vitalsHint}</Text> : null}
         </View>
 
         <View style={styles.bottom}>
-          <AiBubble text={line ?? DEFAULT_LINE} />
+          <AiBubble text={spokenLine ?? DEFAULT_LINE} />
         </View>
       </SafeAreaView>
     </View>

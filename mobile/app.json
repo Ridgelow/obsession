@@ -22,10 +22,35 @@
         "backgroundColor": "#0e0707",
         "foregroundImage": "./assets/icon.png"
       },
-      "package": "com.obsession.app"
+      "package": "com.obsession.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "@config-plugins/react-native-webrtc",
+      "@livekit/react-native-expo-plugin",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0"
+          },
+          "android": {
+            "minSdkVersion": 28
+          }
+        }
+      ],
+      "./modules/smart-spectra/app.plugin.js"
+    ]
   }
 }

@@ -43,7 +43,10 @@ Tiger Cloud (once): paste `db/schema.sql` into the SQL editor, then set
 
 ```bash
 ngrok http 8787
-# Agent Custom LLM URL: https://<ngrok>/llm/chat/completions
+# Agent Custom LLM URL must be exactly:
+#   https://<public-host>/llm/chat/completions
+# Current demo tunnel (Hasnain's Obsession First Date agent):
+#   https://snowboard-fact-separate-montana.trycloudflare.com/llm/chat/completions
 ```
 
 ## Phase A curl smoke tests

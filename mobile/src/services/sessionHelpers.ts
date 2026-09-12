@@ -30,12 +30,14 @@ export type StartSessionResponse = {
   priorPatterns: string | null;
 };
 
+export type TelemetrySource = "presage" | "simulator";
+
 export type TelemetryReading = {
   heartRate: number;
   breathingRate?: number;
   engagement?: number;
-  /** Server defaults to "presage" when omitted. Simulator must send "simulator". */
-  source?: string;
+  /** Server defaults to "presage" when omitted. Always send "presage" or "simulator". */
+  source?: TelemetrySource;
 };
 
 export type TelemetryResponse = {

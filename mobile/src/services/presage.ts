@@ -1,64 +1,126 @@
-// Presage SmartSpectra — native iOS/Android SDK (no official RN package yet).
-// Prefer the vitals simulator for demo reliability. Native is an optional stub.
+// Presage SmartSpectra — real camera HR is primary.
+// Native iOS/Android SDK (no official RN package). Local Expo module
+// `obsession-smart-spectra` bridges SmartSpectra when a dev client is built.
+// Simulator is emergency fallback only (missing key, no native module, start fail).
 
-export type VitalsReading = {
-  heartRate: number;
-  breathingRate?: number;
-  engagement?: number;
-  source?: string;
-};
+import { PermissionsAndroid, Platform } from "react-native";
+import { getNativeSmartSpectra } from "../native/smartSpectra";
+import {
+  createVitalsSimulator,
+  isPresageConfigured,
+  presageApiKey,
+  vitalsFallbackHint,
+  type VitalsFallbackReason,
+  type VitalsKind,
+  type VitalsReading,
+  type VitalsSource,
+} from "./presageConfig";
 
-export type VitalsSource = {
-  tick(): VitalsReading;
+export {
+  createVitalsSimulator,
+  isPresageConfigured,
+  presageApiKey,
+  vitalsFallbackHint,
+} from "./presageConfig";
+
+export type {
+  VitalsFallbackReason,
+  VitalsKind,
+  VitalsReading,
+  VitalsSource,
+} from "./presageConfig";
+
+export type LiveVitals = {
+  kind: VitalsKind;
+  fallbackReason: VitalsFallbackReason;
+  hint: string | null;
+  /** Latest HR. Null while the camera is warming — do not invent a reading. */
+  latest(): VitalsReading | null;
   reset(): void;
+  stop(): Promise<void>;
 };
 
-/** Keep simulator first. Flip only if a native bridge is actually installed. */
-export const PREFER_SIMULATOR = true;
-
-/** Demo simulator: climbs from baseline toward a nerve spike. */
-export function createVitalsSimulator(baseline = 71): VitalsSource {
-  let t = 0;
+function wrapSimulator(reason: VitalsFallbackReason): LiveVitals {
+  const sim = createVitalsSimulator();
   return {
-    tick(): VitalsReading {
-      t += 1;
-      let heartRate = baseline;
-      if (t >= 12) heartRate = baseline + 7;
-      if (t >= 20) heartRate = baseline + 13;
-      if (t >= 28) heartRate = baseline + 18;
-      return {
-        heartRate,
-        breathingRate: 14,
-        engagement: 0.6,
-        source: "simulator",
-      };
+    kind: "simulator",
+    fallbackReason: reason,
+    hint: vitalsFallbackHint(reason),
+    latest() {
+      return sim.tick();
     },
     reset() {
-      t = 0;
+      sim.reset();
+    },
+    async stop() {
+      sim.reset();
     },
   };
 }
 
-/** Optional native stub — do not call in the demo path. */
-export function createNativePresageStub(): VitalsSource {
-  return {
-    tick(): VitalsReading {
-      throw new Error(
-        "Presage native bridge not wired — use createVitalsSimulator()."
-      );
-    },
-    reset() {},
-  };
+async function requestCameraPermission(): Promise<boolean> {
+  if (Platform.OS !== "android") return true;
+  const granted = await PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.CAMERA,
+    {
+      title: "Camera",
+      message: "Obsession uses the camera to read heart rate during the date.",
+      buttonPositive: "OK",
+    }
+  );
+  return granted === PermissionsAndroid.RESULTS.GRANTED;
 }
 
-/** Demo entry: always the simulator unless native is explicitly opted in. */
-export function createVitalsSource(
-  baseline = 71,
-  opts?: { native?: boolean }
-): VitalsSource {
-  if (opts?.native && !PREFER_SIMULATOR) {
-    return createNativePresageStub();
+/**
+ * Prefer native SmartSpectra when the API key and native module are present.
+ * Falls back to the vitals simulator only if those are missing or start fails.
+ */
+export async function openVitalsSource(): Promise<LiveVitals> {
+  const key = presageApiKey();
+  if (!key) return wrapSimulator("missing_key");
+
+  const native = getNativeSmartSpectra();
+  if (!native) return wrapSimulator("native_unavailable");
+
+  try {
+    await requestCameraPermission();
+    await native.start(key);
+    return {
+      kind: "presage",
+      fallbackReason: null,
+      hint: "Camera HR live",
+      latest() {
+        const reading = native.latestReading();
+        if (
+          !reading ||
+          !Number.isFinite(reading.heartRate) ||
+          reading.heartRate <= 0
+        ) {
+          return null;
+        }
+        return {
+          heartRate: Math.round(reading.heartRate),
+          breathingRate: reading.breathingRate,
+          engagement: reading.engagement ?? 0.6,
+          source: "presage",
+        };
+      },
+      reset() {},
+      async stop() {
+        try {
+          await native.stop();
+        } catch {
+          // Camera already torn down.
+        }
+      },
+    };
+  } catch {
+    return wrapSimulator("native_failed");
   }
+}
+
+/** @deprecated Use openVitalsSource(). Kept so older call sites still compile. */
+export function createVitalsSource(baseline = 71): VitalsSource {
   return createVitalsSimulator(baseline);
 }
 
@@ -67,6 +129,6 @@ export async function submitClipForAnalysis(
   _sessionId: string
 ): Promise<VitalsReading> {
   throw new Error(
-    "Presage cloud/native bridge not wired yet — use createVitalsSimulator()."
+    "Presage cloud clip upload is not wired — LiveDate uses the native SDK or simulator."
   );
 }
