@@ -19,6 +19,16 @@ AI dating-conversation simulator/coach.
 cd mobile && npm start
 ```
 
+## Quick start (server brain — Phase A)
+
+```bash
+cd server && npm i && cp .env.example .env   # fill keys; never commit .env
+npm run dev                                  # :8787
+```
+
+Run `server/db/schema.sql` once on Tiger Cloud. Curl smoke tests:
+[`server/README.md`](server/README.md).
+
 ## Stack
 
 Persona · Gemini · ElevenLabs · Presage · Tiger Data · Backboard

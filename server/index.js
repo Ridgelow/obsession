@@ -5,15 +5,49 @@ import { sessionRouter } from "./routes/session.js";
 import { telemetryRouter } from "./routes/telemetry.js";
 import { llmWebhookRouter } from "./routes/llmWebhook.js";
 import { coachingRouter } from "./routes/coaching.js";
+import { PORT, hasBackboardKeys, hasGeminiKey } from "./config.js";
+import { describeDb } from "./db.js";
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
+
+app.get("/health", (_req, res) => {
+  const db = describeDb();
+  res.json({
+    ok: true,
+    service: "obsession-server",
+    port: PORT,
+    db: db.mode,
+    gemini: hasGeminiKey(),
+    backboard: hasBackboardKeys(),
+  });
+});
 
 app.use(sessionRouter);
 app.use(telemetryRouter);
 app.use(llmWebhookRouter);
 app.use(coachingRouter);
 
-const port = process.env.PORT || 8787;
-app.listen(port, () => console.log(`obsession-server listening on :${port}`));
+app.use((err, _req, res, _next) => {
+  const status = err.status || 500;
+  console.error("[http]", status, err.message);
+  res.status(status).json({
+    error: err.message || "internal error",
+    hint: err.hint,
+  });
+});
+
+app.listen(PORT, "0.0.0.0", () => {
+  const db = describeDb();
+  console.log(`obsession-server listening on :${PORT}`);
+  console.log(
+    `[boot] db=${db.mode} gemini=${hasGeminiKey()} backboard=${hasBackboardKeys()}`
+  );
+  if (db.mode === "memory") console.warn(`[boot] ${db.hint}`);
+  if (!hasGeminiKey()) {
+    console.warn(
+      "[boot] GEMINI_API_KEY unset — nextDateLine / coachSession use fallback copy"
+    );
+  }
+});

@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "start": "node index.js",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@google/genai": "^0.3.0",
