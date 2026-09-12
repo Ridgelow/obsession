@@ -17,6 +17,7 @@ import { AppProvider } from "./src/state/AppState";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { VoiceGateway } from "./src/services/voiceGateway";
 import { loadVerified } from "./src/services/verifiedStorage";
+import { EMPTY_PROFILE, loadProfile, type UserProfile } from "./src/services/profileStorage";
 import { colors } from "./src/theme";
 
 const navTheme = {
@@ -39,19 +40,24 @@ export default function App() {
     Manrope_500Medium,
     Manrope_700Bold,
   });
-  const [boot, setBoot] = useState<{ ready: boolean; verified: boolean }>({
+  const [boot, setBoot] = useState<{
+    ready: boolean;
+    verified: boolean;
+    profile: UserProfile;
+  }>({
     ready: false,
     verified: false,
+    profile: EMPTY_PROFILE,
   });
 
   useEffect(() => {
     let cancelled = false;
-    loadVerified()
-      .then((record) => {
-        if (!cancelled) setBoot({ ready: true, verified: record.verified });
+    Promise.all([loadVerified(), loadProfile()])
+      .then(([record, profile]) => {
+        if (!cancelled) setBoot({ ready: true, verified: record.verified, profile });
       })
       .catch(() => {
-        if (!cancelled) setBoot({ ready: true, verified: false });
+        if (!cancelled) setBoot({ ready: true, verified: false, profile: EMPTY_PROFILE });
       });
     return () => {
       cancelled = true;
@@ -76,7 +82,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <VoiceGateway>
-        <AppProvider initialVerified={boot.verified}>
+        <AppProvider initialVerified={boot.verified} initialProfile={boot.profile}>
           <NavigationContainer theme={navTheme}>
             <StatusBar style="light" />
             <RootNavigator />

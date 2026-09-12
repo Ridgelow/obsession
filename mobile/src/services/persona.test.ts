@@ -30,11 +30,11 @@ async function run(): Promise<void> {
   assert(mockFallbackLabel() != null, "mock label when unconfigured");
 
   process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID =
-    "  persona_sandbox_2ccdba5e-08cd-4e47-965f-a59133988bb0  ";
+    "  persona_sandbox_test-fixture-not-a-real-key  ";
   assert(isPersonaConfigured() === true, "template id is configured");
   assert(
     personaTemplateId() ===
-      "persona_sandbox_2ccdba5e-08cd-4e47-965f-a59133988bb0",
+      "persona_sandbox_test-fixture-not-a-real-key",
     "template id trims"
   );
   assert(personaEnvironmentName() === "sandbox", "sandbox from template id");
@@ -46,10 +46,26 @@ async function run(): Promise<void> {
   assert(shouldUsePersonaMock() === true, "non-itmpl_ uses mock");
   assert(mockFallbackLabel() != null, "mock label for non-itmpl_ placeholder");
 
-  process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID = "itmpl_live_prod";
-  assert(personaEnvironmentName() === "production", "prod when not sandbox");
+  process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID = "itmpl_AMQoTy2ziE377HwuVVf1h8Q78ms4VJ";
+  assert(
+    personaEnvironmentName() === "sandbox",
+    "opaque real itmpl_ ids default to sandbox — they never encode env in the id"
+  );
   assert(shouldUsePersonaMock() === false, "valid itmpl_ is live path");
   assert(mockFallbackLabel() === null, "no mock label for live itmpl_");
+
+  process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID = "itmpl_live_production";
+  assert(
+    personaEnvironmentName() === "production",
+    "id containing production word is detected without an override"
+  );
+
+  process.env.EXPO_PUBLIC_PERSONA_ENVIRONMENT = "production";
+  assert(
+    personaEnvironmentName("itmpl_AMQoTy2ziE377HwuVVf1h8Q78ms4VJ") === "production",
+    "explicit env override wins over the opaque-id default"
+  );
+  delete process.env.EXPO_PUBLIC_PERSONA_ENVIRONMENT;
 
   process.env.EXPO_PUBLIC_PERSONA_USE_MOCK = "1";
   assert(shouldUsePersonaMock() === true, "force mock overrides itmpl_");
@@ -106,7 +122,7 @@ async function run(): Promise<void> {
   assert(unlocked === PERSONA_MOCK_INQUIRY_ID, "startVerification mocks when id missing");
 
   process.env.EXPO_PUBLIC_PERSONA_TEMPLATE_ID =
-    "persona_sandbox_2ccdba5e-08cd-4e47-965f-a59133988bb0";
+    "persona_sandbox_test-fixture-not-a-real-key";
   unlocked = "";
   await startVerification({
     onVerified: (id) => {

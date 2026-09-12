@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { MainTabParamList, RootStackParamList } from "./types";
+import { SignUpScreen } from "../screens/SignUpScreen";
 import { OnboardingScreen } from "../screens/OnboardingScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { HistoryScreen } from "../screens/HistoryScreen";
@@ -49,7 +50,13 @@ function MainTabs() {
 }
 
 export function RootNavigator() {
-  const { verified } = useAppState();
+  const { verified, profileComplete } = useAppState();
+
+  const initialRouteName = !verified
+    ? "SignUp"
+    : !profileComplete
+      ? "Onboarding"
+      : "Main";
 
   return (
     <Stack.Navigator
@@ -58,8 +65,9 @@ export function RootNavigator() {
         contentStyle: { backgroundColor: colors.void },
         animation: "fade",
       }}
-      initialRouteName={verified ? "Main" : "Onboarding"}
+      initialRouteName={initialRouteName}
     >
+      <Stack.Screen name="SignUp" component={SignUpScreen} />
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="Main" component={MainTabs} />
       <Stack.Screen

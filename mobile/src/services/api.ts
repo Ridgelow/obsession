@@ -46,6 +46,33 @@ function assertOk(res: Response): void {
   }
 }
 
+export type PersonaAgeVerifyResult = {
+  verified: boolean;
+  reason?: string | null;
+  age?: number;
+  idDateOfBirth?: string;
+  mock?: boolean;
+  status?: string;
+};
+
+/**
+ * POST /persona/verify-age { inquiryId, dateOfBirth } → server fetches the
+ * completed Persona Inquiry and confirms the ID says 18+ and its birthdate
+ * matches what the user typed. The mobile SDK alone can't do this — Persona
+ * never exposes extracted ID fields to the client.
+ */
+export async function verifyAgeWithPersona(
+  inquiryId: string,
+  dateOfBirth: string
+): Promise<PersonaAgeVerifyResult> {
+  const res = await request("/persona/verify-age", {
+    method: "POST",
+    body: JSON.stringify({ inquiryId, dateOfBirth }),
+  });
+  assertOk(res);
+  return res.json() as Promise<PersonaAgeVerifyResult>;
+}
+
 /** POST /session/start { userId, scenario } → { sessionId, priorPatterns } */
 export async function startSession(
   userId: string,

@@ -1,131 +1,168 @@
-import { useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { View, Text, TextInput, ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/types";
+import { Wordmark } from "../components/Wordmark";
 import { ObCard } from "../components/ObCard";
 import { ObButton } from "../components/ObButton";
+import { ObChipGroup } from "../components/ObChipGroup";
+import { Eyebrow } from "../components/Eyebrow";
 import { colors, fonts, spacing, type } from "../theme";
 import { useAppState } from "../state/AppState";
-import { mockFallbackLabel, startVerification } from "../services/persona";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Onboarding">;
 
-export function OnboardingScreen({ navigation }: Props) {
-  const { verified, setVerified } = useAppState();
-  const [verifying, setVerifying] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const mockLabel = mockFallbackLabel();
-  const usingMock = Boolean(mockLabel);
+const GENDER_OPTIONS = ["Woman", "Man", "Non-binary", "Prefer not to say"];
+const GOAL_OPTIONS = [
+  "Build confidence",
+  "Practice conversation",
+  "Reduce dating anxiety",
+  "Just for fun",
+];
+const DATES_OPTIONS = ["0", "1-3", "4-10", "10+"];
+const YES_NO_OPTIONS = ["Yes", "No"];
 
-  const onVerify = () => {
-    setVerifying(true);
-    setError(null);
-    void startVerification({
-      onVerified: (inquiryId) => {
-        setVerified(true, inquiryId);
-        setVerifying(false);
-      },
-      onCanceled: () => {
-        setVerifying(false);
-      },
-      onError: (message) => {
-        setError(message);
-        setVerifying(false);
-      },
-    }).catch((err: unknown) => {
-      setError(err instanceof Error ? err.message : "Verification failed");
-      setVerifying(false);
+export function OnboardingScreen({ navigation }: Props) {
+  const { profile, setProfile } = useAppState();
+  const [name, setName] = useState(profile.name);
+  const [gender, setGender] = useState(profile.gender);
+  const [goals, setGoals] = useState<string[]>(profile.goals);
+  const [datesRange, setDatesRange] = useState(profile.datesRange);
+  const [hadPartner, setHadPartner] = useState(profile.hadPartner);
+  // Set once during Sign Up's 18+ check and never edited here — captured in
+  // a ref (not spread from `profile`) so it doesn't retrigger the autosave
+  // effect below on every save.
+  const dateOfBirthRef = useRef(profile.dateOfBirth);
+
+  const canSubmit = useMemo(
+    () =>
+      name.trim().length > 0 &&
+      gender.length > 0 &&
+      goals.length > 0 &&
+      datesRange.length > 0 &&
+      hadPartner.length > 0,
+    [name, gender, goals, datesRange, hadPartner]
+  );
+
+  const toggleGoal = (value: string) => {
+    setGoals((prev) =>
+      prev.includes(value) ? prev.filter((g) => g !== value) : [...prev, value]
+    );
+  };
+
+  // Autosave: every answer persists as it's made, so progress survives an
+  // app kill even before Submit. Debounced so typing a name doesn't write
+  // to AsyncStorage on every keystroke.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setProfile({
+        name: name.trim(),
+        dateOfBirth: dateOfBirthRef.current,
+        gender,
+        goals,
+        datesRange,
+        hadPartner,
+      });
+    }, 300);
+    return () => clearTimeout(id);
+  }, [name, gender, goals, datesRange, hadPartner, setProfile]);
+
+  const onSubmit = () => {
+    if (!canSubmit) return;
+    setProfile({
+      name: name.trim(),
+      dateOfBirth: dateOfBirthRef.current,
+      gender,
+      goals,
+      datesRange,
+      hadPartner,
     });
+    navigation.replace("Main");
   };
 
   return (
-    <View style={styles.root}>
-      <LinearGradient
-        colors={["#3a1218", colors.void, colors.void]}
-        locations={[0, 0.35, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.hero}>
-          <Text style={styles.wordmarkHero}>OBSESSION</Text>
+          <Wordmark size="hero" />
           <Text style={styles.tagline}>
             Stop practicing dates in your head.
           </Text>
         </View>
 
         <ObCard style={styles.card}>
-          <View style={styles.cardTitleRow}>
-            <Ionicons name="shield-checkmark" size={18} color={colors.pulse} />
-            <Text style={styles.cardTitle}>One quick check.</Text>
-          </View>
-          <Text style={styles.cardBody}>
-            We confirm you’re 18+ with Persona before your first practice
-            date — about 20 seconds, and your data stays private.
-          </Text>
-          <ObButton
-            label={
-              verifying
-                ? usingMock
-                  ? "Verifying…"
-                  : "Opening Persona…"
-                : usingMock
-                  ? "Verify (demo mock)"
-                  : "Verify with Persona"
-            }
-            variant="outline"
-            onPress={onVerify}
-            disabled={verifying || verified}
-            style={styles.verifyBtn}
+          <Eyebrow>Your name</Eyebrow>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="What should we call you?"
+            placeholderTextColor={colors.muted}
+            style={styles.input}
+            autoCapitalize="words"
+            returnKeyType="done"
           />
-          {mockLabel && !verified ? (
-            <Text style={styles.mockLabel}>{mockLabel}</Text>
-          ) : null}
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          {verified ? (
-            <View style={styles.verifiedRow}>
-              <Ionicons name="checkmark" size={16} color={colors.pulse} />
-              <Text style={styles.verifiedText}>Verified — you’re all set</Text>
-            </View>
-          ) : null}
         </ObCard>
 
-        <View style={styles.footer}>
-          <ObButton
-            label="Continue"
-            onPress={() => navigation.replace("Main")}
-            disabled={!verified}
+        <ObCard style={styles.card}>
+          <Eyebrow>Gender</Eyebrow>
+          <ObChipGroup
+            options={GENDER_OPTIONS}
+            selected={gender ? [gender] : []}
+            onToggle={setGender}
           />
-          <Text style={styles.footerHint}>
-            You can redo this anytime from Profile.
-          </Text>
-        </View>
-      </SafeAreaView>
-    </View>
+        </ObCard>
+
+        <ObCard style={styles.card}>
+          <Eyebrow>Your goals</Eyebrow>
+          <ObChipGroup options={GOAL_OPTIONS} selected={goals} onToggle={toggleGoal} />
+        </ObCard>
+
+        <ObCard style={styles.card}>
+          <Eyebrow>How many dates have you been on?</Eyebrow>
+          <ObChipGroup
+            options={DATES_OPTIONS}
+            selected={datesRange ? [datesRange] : []}
+            onToggle={setDatesRange}
+          />
+        </ObCard>
+
+        <ObCard style={styles.card}>
+          <Eyebrow>Have you ever had a boyfriend/girlfriend?</Eyebrow>
+          <ObChipGroup
+            options={YES_NO_OPTIONS}
+            selected={hadPartner ? [hadPartner] : []}
+            onToggle={setHadPartner}
+          />
+        </ObCard>
+
+        <ObButton
+          label="Submit"
+          onPress={onSubmit}
+          disabled={!canSubmit}
+          style={styles.submitBtn}
+        />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.void },
-  safe: {
-    flex: 1,
+  safe: { flex: 1, backgroundColor: colors.void },
+  content: {
     paddingHorizontal: spacing.lg,
-    justifyContent: "space-between",
-    paddingBottom: spacing.lg,
-  },
-  hero: {
-    paddingTop: spacing.xxl,
-    alignItems: "center",
+    paddingBottom: spacing.xxl,
     gap: spacing.md,
   },
-  wordmarkHero: {
-    fontFamily: fonts.display,
-    fontSize: 44,
-    color: colors.bone,
-    letterSpacing: -1,
-    textAlign: "center",
+  hero: {
+    paddingTop: spacing.lg,
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   tagline: {
     fontFamily: fonts.displayItalic,
@@ -133,51 +170,16 @@ const styles = StyleSheet.create({
     color: colors.tagline,
     textAlign: "center",
   },
-  card: { gap: spacing.md },
-  cardTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  cardTitle: {
-    fontFamily: fonts.bodySemibold,
-    fontSize: type.headline,
+  card: { gap: spacing.sm },
+  input: {
+    fontFamily: fonts.body,
+    fontSize: type.body,
     color: colors.bone,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  cardBody: {
-    fontFamily: fonts.body,
-    fontSize: type.subhead,
-    lineHeight: 22,
-    color: colors.muted,
-  },
-  verifyBtn: { marginTop: spacing.sm },
-  mockLabel: {
-    fontFamily: fonts.body,
-    fontSize: type.caption1,
-    lineHeight: 16,
-    color: colors.muted,
-  },
-  errorText: {
-    fontFamily: fonts.body,
-    fontSize: type.footnote,
-    lineHeight: 18,
-    color: colors.pulse,
-  },
-  verifiedRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  verifiedText: {
-    fontFamily: fonts.body,
-    fontSize: type.footnote,
-    color: colors.pulse,
-  },
-  footer: { gap: spacing.sm },
-  footerHint: {
-    fontFamily: fonts.body,
-    fontSize: type.caption1,
-    color: colors.muted,
-    textAlign: "center",
-  },
+  submitBtn: { marginTop: spacing.sm },
 });

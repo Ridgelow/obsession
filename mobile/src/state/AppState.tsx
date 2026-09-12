@@ -18,12 +18,21 @@ import {
   saveHistory,
   type HistoryEntry,
 } from "../services/historyStorage";
+import {
+  EMPTY_PROFILE,
+  isProfileComplete,
+  persistProfile,
+  type UserProfile,
+} from "../services/profileStorage";
 
 export type Scenario = "First Date" | "Coffee Chat" | "Silence";
 
 type AppState = {
   verified: boolean;
   setVerified: (v: boolean, inquiryId?: string) => void;
+  profile: UserProfile;
+  profileComplete: boolean;
+  setProfile: (p: UserProfile) => void;
   sessionCount: number;
   bumpSessionCount: () => void;
   scenario: Scenario;
@@ -50,11 +59,14 @@ const Ctx = createContext<AppState | null>(null);
 export function AppProvider({
   children,
   initialVerified = false,
+  initialProfile = EMPTY_PROFILE,
 }: {
   children: React.ReactNode;
   initialVerified?: boolean;
+  initialProfile?: UserProfile;
 }) {
   const [verified, setVerifiedState] = useState(initialVerified);
+  const [profile, setProfileState] = useState<UserProfile>(initialProfile);
   const [scenario, setScenario] = useState<Scenario>("First Date");
   const [lastMemory, setLastMemoryState] = useState(FALLBACK_LAST_MEMORY);
   const [sessionCount, setSessionCount] = useState(4);
@@ -86,6 +98,13 @@ export function AppProvider({
       verified: v,
       inquiryId: v ? inquiryId : undefined,
     });
+  }, []);
+
+  const profileComplete = useMemo(() => isProfileComplete(profile), [profile]);
+
+  const setProfile = useCallback((p: UserProfile) => {
+    setProfileState(p);
+    void persistProfile(p);
   }, []);
 
   const setLastMemory = useCallback((m: string) => {
@@ -129,6 +148,9 @@ export function AppProvider({
     () => ({
       verified,
       setVerified,
+      profile,
+      profileComplete,
+      setProfile,
       sessionCount,
       bumpSessionCount,
       scenario,
@@ -146,6 +168,9 @@ export function AppProvider({
     [
       verified,
       setVerified,
+      profile,
+      profileComplete,
+      setProfile,
       setLastMemory,
       scenario,
       lastMemory,

@@ -17,13 +17,19 @@ npm install --legacy-peer-deps
 
 ## What “done” looks like
 
-1. User taps **Verify** on Onboarding  
-2. Real Persona Inquiry UI opens (camera / ID / selfie as template requires)  
-3. On success (`completed` / `approved` / `passed`) → Continue unlocks  
-4. Verified state persists via AsyncStorage (`obsession.persona.verified`)  
-5. UI must **not** show the demo-mock label when live
+1. User types a birthday on Sign Up (rejected client-side if under 18)
+2. User taps **Verify You Are Human**
+3. Real Persona Inquiry UI opens (camera / ID / selfie as template requires)
+4. On success (`completed` / `approved` / `passed`), the app calls
+   `POST /persona/verify-age { inquiryId, dateOfBirth }` on the server —
+   Persona's mobile SDK never hands the extracted ID fields to the client,
+   so this server call is what actually confirms the ID says 18+ **and**
+   its birthdate matches what was typed
+5. Only when that call returns `verified: true` → Continue unlocks
+6. Verified state persists via AsyncStorage (`obsession.persona.verified`)
+7. UI must **not** show the demo-mock label when live
 
-Right now main ships with **mock on** so the rest of the demo works without a real `itmpl_` id.
+Right now main ships with **mock on** so the rest of the demo works without a real `itmpl_` id. The mock inquiry has no real ID to check, so the server trusts the typed birthday for that one specific inquiry id (`inq_mock_unconfigured`) — see `server/persona.js`.
 
 ---
 
@@ -85,6 +91,15 @@ Rules coded in `personaConfig.ts`:
 
 After changing `.env`, restart Metro (`npx expo start --clear`).
 
+Server also needs `server/.env`:
+
+```bash
+# REQUIRED for /persona/verify-age to check a real ID (Persona Dashboard → Settings → API Keys)
+PERSONA_API_KEY=persona_...
+```
+
+Without it, `/persona/verify-age` returns `{ verified: false, reason: "not_configured" }` for any real inquiry — only the mock inquiry id passes. The mobile app also needs `EXPO_PUBLIC_API_URL` pointing at this server (see `README.md` Phase A) — **Sign Up cannot complete, mock or not, if the server is unreachable.**
+
 ---
 
 ## Native build requirements (cannot use Expo Go)
@@ -120,10 +135,15 @@ Settings → Obsession → confirm permissions if Inquiry fails silently.
 | `mobile/src/services/personaConfig.ts` | Env helpers, mock vs live rules, verified status parsing — **safe / no native import** |
 | `mobile/src/services/persona.native.ts` | Live SDK — **lazy `require("react-native-persona")`** so boot doesn’t crash |
 | `mobile/src/services/persona.ts` | Web / tests stub |
-| `mobile/src/screens/OnboardingScreen.tsx` | Verify button UI + handlers |
+| `mobile/src/screens/SignUpScreen.tsx` | Verify button UI + handlers — the only Persona entry point |
+| `mobile/src/screens/OnboardingScreen.tsx` | Post-verification profile form (name/gender/goals/dates/partner history) — not Persona-related, just gates Home until answered |
+| `mobile/src/services/profileStorage.ts` | AsyncStorage persist for the Onboarding profile answers |
 | `mobile/src/services/verifiedStorage.ts` | AsyncStorage persist |
+| `mobile/src/services/api.ts` | `verifyAgeWithPersona()` — calls the server cross-check after Persona's Inquiry completes |
 | `mobile/plugins/withPersona.js` | Expo config plugin |
 | `mobile/src/state/AppState.tsx` | `verified` / `setVerified` |
+| `server/persona.js` | Fetches the completed Inquiry from Persona's API, extracts the ID's birthdate, checks match + 18+ |
+| `server/routes/persona.js` | `POST /persona/verify-age` route |
 
 Do **not** add a top-level `import … from "react-native-persona"` at app boot. That previously contributed to native-module crashes. Keep lazy load inside `startVerification` when not mocking.
 
@@ -133,14 +153,17 @@ Unlock statuses accepted today: `completed` | `approved` | `passed` (see `isVeri
 
 ## Suggested work checklist
 
-1. [ ] Persona dashboard: create/copy **sandbox 18+** template → `itmpl_…`  
-2. [ ] Set `EXPO_PUBLIC_PERSONA_TEMPLATE_ID` + `EXPO_PUBLIC_PERSONA_USE_MOCK=0`  
-3. [ ] Dev client on phone (`expo run:ios --device` / Android)  
-4. [ ] Tap Verify → real Inquiry → approved → Continue  
-5. [ ] Kill app, reopen → still verified (storage)  
-6. [ ] Confirm Onboarding **does not** show “Demo mock — not a real Persona inquiry…”  
-7. [ ] Run tests: `cd mobile && npm run test:helpers` (includes `persona.test.ts`)  
-8. [ ] Optional: decline / cancel paths show honest errors; don’t unlock Continue  
+1. [ ] Persona dashboard: create/copy **sandbox 18+** template → `itmpl_…`, grab `PERSONA_API_KEY`
+2. [ ] Set `EXPO_PUBLIC_PERSONA_TEMPLATE_ID` + `EXPO_PUBLIC_PERSONA_USE_MOCK=0` in `mobile/.env`
+3. [ ] Set `PERSONA_API_KEY` in `server/.env`, run the server (`cd server && npm run dev`)
+4. [ ] Dev client on phone (`expo run:ios --device` / Android)  
+5. [ ] Enter a real 18+ birthday → Confirm birthday
+6. [ ] Tap Verify You Are Human → real Inquiry → scan a real ID → server confirms match + 18+ → Continue unlocks
+7. [ ] Kill app, reopen → still verified (storage)  
+8. [ ] Confirm Sign Up **does not** show “Demo mock — not a real Persona inquiry…”  
+9. [ ] Run tests: `cd mobile && npm run test:helpers` and `cd server && npm test`
+10. [ ] Optional: decline / cancel paths show honest errors; don’t unlock Continue
+11. [ ] Optional: type a birthday that doesn't match your real ID → server should reject with "doesn't match the birthday you entered"
 
 ---
 
@@ -153,6 +176,9 @@ Unlock statuses accepted today: `completed` | `approved` | `passed` (see `isVeri
 | App crash on launch after adding Persona imports | Top-level native import — use lazy require |
 | Inquiry opens then fails permissions | Camera/Location denied in Settings |
 | Template API errors | Wrong env (sandbox id with production) or bad `itmpl_` |
+| "Couldn't confirm your ID" after a real scan | Server unreachable, or `PERSONA_API_KEY` unset (check `/health`'s `persona` field) |
+| Checkbox never checks even on mock | Server (`server/`) isn't running / `EXPO_PUBLIC_API_URL` wrong — the mock path now round-trips through `/persona/verify-age` too |
+| ID scan "completes" but extracted birthdate is always the same wrong date, no matter what real ID you scan | **Expected and confirmed in Sandbox.** Persona's Sandbox environment (labeled "Simulated Data" in the dashboard's Attributes panel) does not OCR the real document — every inquiry returns the same fixed fake identity: **`ALEXANDER J SAMPLE`, born `1977-07-17`**, ID number `I1234562`, address `600 California Street, San Francisco`. This is Persona's own test fixture, not something either app can change. To exercise the **match/pass** path deterministically, type `07/17/1977` as the Sign Up birthday — that's the one value that will match. Real OCR against a real ID only happens in Persona's **Production** environment (a separate account-level approval from Persona, not a config flag). |
 
 ---
 
@@ -162,13 +188,19 @@ Unlock statuses accepted today: `completed` | `approved` | `passed` (see `isVeri
 - Presage camera HR (intentionally **simulator** for now — SmartSpectra SPM crashed launch)  
 - Server Custom LLM / Tiger / Backboard  
 
-Focus Persona on **Onboarding → verified unlock**. Rest of the loop can keep using mock verify until you flip env.
+Focus Persona on **Sign Up → verified unlock**. Rest of the loop can keep using mock verify until you flip env.
 
 ---
 
 ## Quick smoke commands
 
 ```bash
+cd server
+npm install
+npm test
+npm run dev            # keep running — Sign Up needs this reachable
+
+# other terminal:
 cd mobile
 npm install --legacy-peer-deps
 npm run test:helpers

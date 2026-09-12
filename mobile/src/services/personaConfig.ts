@@ -3,10 +3,6 @@
 
 export const PERSONA_TEMPLATE_ID_ENV = "EXPO_PUBLIC_PERSONA_TEMPLATE_ID";
 
-/** Sandbox 18+ template from the Persona dashboard. Copy into mobile/.env. */
-export const PERSONA_SANDBOX_18_TEMPLATE_ID =
-  "persona_sandbox_2ccdba5e-08cd-4e47-965f-a59133988bb0";
-
 export const VERIFIED_STORAGE_KEY = "obsession.persona.verified";
 
 export const PERSONA_DEV_CLIENT_HINT =
@@ -56,11 +52,24 @@ export function shouldUsePersonaMock(): boolean {
   return !isPersonaTemplateToken();
 }
 
-/** Sandbox template ids include "sandbox"; otherwise production. */
+/**
+ * Real Persona `itmpl_` ids are opaque — unlike hand-written placeholders,
+ * they never encode "sandbox"/"production" in the string itself — so an id
+ * check alone can't tell the two apart. Prefer an explicit
+ * EXPO_PUBLIC_PERSONA_ENVIRONMENT=sandbox|production override; fall back to
+ * checking the id for either word (for placeholder-style ids); otherwise
+ * default to sandbox, since that's the safe choice for dev/hackathon use —
+ * a mismatched environment makes Inquiry.fromTemplate fail outright.
+ */
 export function personaEnvironmentName(
   templateId = personaTemplateId()
 ): PersonaEnvironmentName {
-  return /sandbox/i.test(templateId) ? "sandbox" : "production";
+  const override = (process.env.EXPO_PUBLIC_PERSONA_ENVIRONMENT ?? "")
+    .trim()
+    .toLowerCase();
+  if (override === "sandbox" || override === "production") return override;
+  if (/production/i.test(templateId)) return "production";
+  return "sandbox";
 }
 
 /**

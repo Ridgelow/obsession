@@ -5,8 +5,10 @@ import { sessionRouter } from "./routes/session.js";
 import { telemetryRouter } from "./routes/telemetry.js";
 import { llmWebhookRouter } from "./routes/llmWebhook.js";
 import { coachingRouter } from "./routes/coaching.js";
+import { personaRouter } from "./routes/persona.js";
 import { PORT, hasBackboardKeys, hasGeminiKey } from "./config.js";
 import { describeDb } from "./db.js";
+import { hasPersonaApiKey } from "./persona.js";
 
 const app = express();
 app.use(cors());
@@ -21,6 +23,7 @@ app.get("/health", (_req, res) => {
     db: db.mode,
     gemini: hasGeminiKey(),
     backboard: hasBackboardKeys(),
+    persona: hasPersonaApiKey(),
   });
 });
 
@@ -28,6 +31,7 @@ app.use(sessionRouter);
 app.use(telemetryRouter);
 app.use(llmWebhookRouter);
 app.use(coachingRouter);
+app.use(personaRouter);
 
 app.use((err, _req, res, _next) => {
   const status = err.status || 500;
@@ -42,12 +46,17 @@ app.listen(PORT, "0.0.0.0", () => {
   const db = describeDb();
   console.log(`obsession-server listening on :${PORT}`);
   console.log(
-    `[boot] db=${db.mode} gemini=${hasGeminiKey()} backboard=${hasBackboardKeys()}`
+    `[boot] db=${db.mode} gemini=${hasGeminiKey()} backboard=${hasBackboardKeys()} persona=${hasPersonaApiKey()}`
   );
   if (db.mode === "memory") console.warn(`[boot] ${db.hint}`);
   if (!hasGeminiKey()) {
     console.warn(
       "[boot] GEMINI_API_KEY unset — nextDateLine / coachSession use fallback copy"
+    );
+  }
+  if (!hasPersonaApiKey()) {
+    console.warn(
+      "[boot] PERSONA_API_KEY unset — /persona/verify-age only trusts the mock inquiry, real IDs will fail age check"
     );
   }
 });

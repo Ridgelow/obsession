@@ -29,7 +29,7 @@ export function ProfileScreen({ navigation }: Props) {
         variant="outline"
         onPress={() => {
           setVerified(false);
-          navigation.getParent()?.navigate("Onboarding");
+          navigation.getParent()?.navigate("SignUp");
         }}
         style={styles.btn}
       />

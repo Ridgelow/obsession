@@ -10,7 +10,7 @@ Live Custom LLM / API tunnel URL changes when the tunnel restarts — use whatev
 
 You can walk this path on a **physical phone**:
 
-1. Onboarding verify (Persona 18+ sandbox, or labeled mock if Persona PR not merged yet)
+1. Sign Up: birthday → Persona ID scan (sandbox 18+, or labeled mock if Persona PR not merged yet; server confirms the ID matches + 18+) → Onboarding profile questions → Home
 2. Home → Begin First Date
 3. LiveDate: **mic** (ElevenLabs) + **camera HR** (Presage) + NERVES↑ when HR jumps
 4. AI voice adapts after a spike (Custom LLM → Gemini)
@@ -27,7 +27,7 @@ You can walk this path on a **physical phone**:
 | Mac with Xcode (iOS) or Android Studio | Dev client build |
 | ElevenLabs account | Agent `agent_4801m2bbx00he4krmxrfdvyt4x2k` |
 | Presage / SmartSpectra key | physiology.presagetech.com |
-| Persona sandbox template | `persona_sandbox_2ccdba5e-08cd-4e47-965f-a59133988bb0` (18+) |
+| Persona sandbox template | `itmpl_AMQoTy2ziE377HwuVVf1h8Q78ms4VJ` — GovID + Selfie (18+) |
 | Tiger + Gemini + Backboard | Already on server `.env` |
 
 ---
@@ -62,7 +62,8 @@ EXPO_PUBLIC_API_URL=https://<current-tunnel-from-group-chat>
 EXPO_PUBLIC_ELEVENLABS_AGENT_ID=agent_4801m2bbx00he4krmxrfdvyt4x2k
 EXPO_PUBLIC_ELEVENLABS_API_KEY=<sk_...>
 EXPO_PUBLIC_PRESAGE_API_KEY=<presage>
-EXPO_PUBLIC_PERSONA_TEMPLATE_ID=persona_sandbox_2ccdba5e-08cd-4e47-965f-a59133988bb0
+EXPO_PUBLIC_PERSONA_TEMPLATE_ID=itmpl_AMQoTy2ziE377HwuVVf1h8Q78ms4VJ
+EXPO_PUBLIC_PERSONA_USE_MOCK=0
 ```
 
 Confirm Agent dashboard Custom LLM URL matches the **latest** group-chat tunnel.
@@ -91,10 +92,18 @@ Grant **Camera** + **Microphone** when prompted.
 - [ ] Mac: `curl localhost:8787/health` → 200
 - [ ] Phone on same network / tunnel: app can `POST /session/start`
 
-### T2 — Onboarding (Persona)
-- [ ] Verify unlocks Continue only when inquiry completes (18+ template)
+### T2 — Sign Up (Persona) → Onboarding
+- [ ] Typing an under-18 birthday and tapping "Confirm birthday" is rejected with an inline error, before Persona ever opens
+- [ ] Server must be running (`server/`) — even the mock inquiry round-trips through `POST /persona/verify-age`
+- [ ] Verify You Are Human unlocks Continue only when Persona's inquiry completes **and** the server confirms the ID matches + 18+ (18+ template + real `PERSONA_API_KEY`)
+- [ ] Typing a birthday that doesn't match your real ID's birthdate → server rejects with a "doesn't match" error, Continue stays locked
 - [ ] Cancel / error paths don’t unlock Continue
 - [ ] If Persona PR not merged: mock verify is clearly labeled
+- [ ] Continue after verify lands on Onboarding (logo/slogan + 4 questions), not Home directly
+- [ ] Submit is disabled until Name, Gender, Goals, Dates count, and Ever-had-partner are all answered
+- [ ] Submit → Home; profile answers are persisted (AsyncStorage) and survive an app restart
+- [ ] Kill app after completing Onboarding, reopen → app goes straight to Home (skips Sign Up and Onboarding)
+- [ ] Profile → "Redo Persona check" clears verified state and returns to Sign Up; existing profile answers are still pre-filled on the Onboarding form afterward
 
 ### T3 — Home
 - [ ] Scenario chips: First Date / Coffee Chat / Silence

@@ -11,6 +11,7 @@ export type ResultsParams = Partial<CoachResponse> & {
 };
 
 export type RootStackParamList = {
+  SignUp: undefined;
   Onboarding: undefined;
   Main: undefined;
   LiveDate: LiveDateParams | undefined;

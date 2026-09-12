@@ -18,7 +18,7 @@ npx expo prebuild --clean
 npx expo run:ios --device
 ```
 
-Persona: `EXPO_PUBLIC_PERSONA_TEMPLATE_ID=persona_sandbox_2ccdba5e-08cd-4e47-965f-a59133988bb0`  
+Persona: `EXPO_PUBLIC_PERSONA_TEMPLATE_ID=itmpl_AMQoTy2ziE377HwuVVf1h8Q78ms4VJ` (sandbox GovID + Selfie template)  
 Package: `react-native-persona` + Expo config plugin `plugins/withPersona.js` (Maven + iOS usage strings).  
 Continue unlocks only after `startVerification` → `onVerified`. Missing template id = labeled mock; set id without a native client = error, not a silent pass.
 
@@ -39,13 +39,14 @@ Presage: `EXPO_PUBLIC_PRESAGE_API_KEY` in `mobile/.env`. Simulator vitals are fa
 ### FE-1 — Shell (done)
 - Expo + Bodoni Moda / Manrope
 - Theme tokens from `brand/tokens.css`
-- Nav: Onboarding → Main tabs → LiveDate → Results
+- Nav: Sign Up (Persona) → Onboarding (profile questions) → Main tabs → LiveDate → Results
 - Shared UI: Wordmark, ObCard, ObButton, Eyebrow, NerveTag, AiBubble
 
 ### FE-2 — Screens with mock data (done / polish next)
 | Screen | Status | Owner later |
 |--------|--------|-------------|
-| Onboarding + Persona UI | `startVerification` + AsyncStorage | Persona teammate |
+| Sign Up + Persona UI | `startVerification` + AsyncStorage | Persona teammate |
+| Onboarding (profile questions) | Local form state + `profileStorage.ts` | Core B |
 | Home (Practice) | Mock memory + scenarios | Core B |
 | Live Date | Vitals simulator → NERVES↑ | Core A + B |
 | Results | Mock scores + timeline | Core B |

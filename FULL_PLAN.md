@@ -301,7 +301,7 @@ Scenarios = different system prompts (First Date / Coffee Chat / Silence).
 2. Backboard save on coach; recall on next start → Home card  
 
 ### Phase E — Persona
-1. Real SDK on Onboarding — `react-native-persona` + `plugins/withPersona.js` + **dev client** (not Expo Go). Template: `EXPO_PUBLIC_PERSONA_TEMPLATE_ID=persona_sandbox_2ccdba5e-08cd-4e47-965f-a59133988bb0` (18+). Continue only after verified; persist in AsyncStorage. Mock is labeled and used only when the template id is missing.  
+1. Real SDK on Sign Up — `react-native-persona` + `plugins/withPersona.js` + **dev client** (not Expo Go). Template: `EXPO_PUBLIC_PERSONA_TEMPLATE_ID=itmpl_AMQoTy2ziE377HwuVVf1h8Q78ms4VJ` (GovID + Selfie, 18+). Continue only after the server (`/persona/verify-age`) confirms the ID matches + 18+; persist in AsyncStorage. Mock is labeled and used only when the template id is missing.  
 2. Theme inquiry if dashboard allows  
 
 ### Phase F — Demo lock
