@@ -1,74 +1,137 @@
 import { Router } from "express";
-import { pool } from "../db.js";
+import {
+  getLastTurn,
+  getLatestTelemetry,
+  getSession,
+  insertTurn,
+} from "../db.js";
 import { nextDateLine } from "../gemini.js";
+import { NERVES_THRESHOLD_BPM } from "../config.js";
+import {
+  asyncRoute,
+  extractMessageText,
+  resolveSessionId,
+} from "../util.js";
 
 export const llmWebhookRouter = Router();
 
-// This is the "custom LLM" endpoint you paste into the ElevenLabs Agent config
-// (Agent → LLM → Custom LLM → Server URL). ElevenLabs' agent handles turn-taking,
-// speech-to-text and text-to-speech; on every AI turn it POSTs an OpenAI-
-// compatible chat-completions request here, and expects an SSE stream back.
-// See: https://elevenlabs.io/docs/eleven-agents/customization/llm/custom-llm
-//
-// The mobile app passes `elevenlabs_extra_body: { sessionId }` when it starts
-// the conversation (see mobile/services/elevenlabs.ts) — that's how this
-// stateless HTTP endpoint knows which Tiger Data session to read telemetry from.
-llmWebhookRouter.post("/llm/chat/completions", async (req, res) => {
-  const { messages, elevenlabs_extra_body, dynamic_variables } = req.body;
-  // Accept either path — confirm which one your SDK/agent version actually
-  // sends by logging req.body once during setup and adjusting if needed.
-  const sessionId = elevenlabs_extra_body?.sessionId || dynamic_variables?.session_id;
-
-  const history = messages
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => ({ speaker: m.role === "assistant" ? "ai" : "user", text: m.content }));
-
-  // Pull the latest telemetry row + the session's baseline to describe the
-  // physiological deviation, if any, as a plain-language signal for Gemini.
-  let latestSignal = null;
-  if (sessionId) {
-    const { rows } = await pool.query(
-      `SELECT t.heart_rate, s.hr_baseline
-       FROM telemetry t JOIN sessions s ON s.id = t.session_id
-       WHERE t.session_id = $1 ORDER BY t.time DESC LIMIT 1`,
-      [sessionId]
-    );
-    if (rows[0]?.hr_baseline) {
-      const delta = Math.round(rows[0].heart_rate - rows[0].hr_baseline);
-      if (Math.abs(delta) >= 12) {
-        latestSignal = `heart rate ${delta > 0 ? "jumped" : "dropped"} ${Math.abs(delta)}bpm on this question`;
-      }
-    }
-  }
-
-  const text = await nextDateLine({ history, latestSignal });
-
-  // Log this AI turn into Tiger Data so the Results timeline can show it later.
-  if (sessionId) {
-    await pool.query(
-      `INSERT INTO conversation_turns (session_id, speaker, text, hr_delta, flagged)
-       VALUES ($1, 'ai', $2, $3, $4)`,
-      [sessionId, text, null, !!latestSignal]
-    );
-  }
-
-  // Respond as a single SSE chunk (non-streaming is fine — ElevenLabs just
-  // needs valid SSE framing, not token-by-token streaming, to work correctly).
+function writeSse(res, text) {
   res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
   res.write(
     `data: ${JSON.stringify({
       id: "chatcmpl-1",
       object: "chat.completion.chunk",
-      choices: [{ delta: { content: text }, index: 0, finish_reason: null }],
-    })}\n\n`
-  );
-  res.write(
-    `data: ${JSON.stringify({
-      id: "chatcmpl-1",
-      object: "chat.completion.chunk",
-      choices: [{ delta: {}, index: 0, finish_reason: "stop" }],
+      choices: [{ delta: { content: text } }],
     })}\n\n`
   );
   res.write("data: [DONE]\n\n");
   res.end();
+}
+
+function toHistory(messages = []) {
+  return messages
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .map((m) => ({
+      speaker: m.role === "assistant" ? "ai" : "user",
+      text: extractMessageText(m.content),
+    }))
+    .filter((turn) => turn.text);
+}
+
+async function maybeLogUserTurn(sessionId, history, hr) {
+  const lastUser = [...history].reverse().find((t) => t.speaker === "user");
+  if (!lastUser) return;
+  const prev = await getLastTurn(sessionId);
+  if (prev?.speaker === "user" && prev.text === lastUser.text) return;
+  await insertTurn({
+    sessionId,
+    speaker: "user",
+    text: lastUser.text,
+    hrBaseline: hr.baseline,
+    hrAtTurn: hr.heartRate,
+    hrDelta: hr.delta,
+    flagged: hr.flagged,
+  });
+}
+
+async function handleChatCompletions(req, res) {
+  const { messages } = req.body || {};
+  const sessionId = resolveSessionId(req.body || {});
+  const history = toHistory(messages);
+
+  let latestSignal = null;
+  let priorPatterns = null;
+  let scenario = "first_date";
+  let hr = { baseline: null, heartRate: null, delta: null, flagged: false };
+
+  if (sessionId) {
+    const session = await getSession(sessionId);
+    if (session) {
+      scenario = session.scenario || "first_date";
+      priorPatterns = session.prior_patterns || null;
+      const latest = await getLatestTelemetry(sessionId);
+      const baseline = session.hr_baseline;
+      if (latest?.heart_rate != null && baseline != null) {
+        const delta = Math.round(Number(latest.heart_rate) - Number(baseline));
+        hr = {
+          baseline: Number(baseline),
+          heartRate: Number(latest.heart_rate),
+          delta,
+          flagged: Math.abs(delta) >= NERVES_THRESHOLD_BPM,
+        };
+        if (hr.flagged) {
+          latestSignal = `heart rate ${delta > 0 ? "jumped" : "dropped"} ${Math.abs(delta)}bpm on this question`;
+        }
+      }
+      await maybeLogUserTurn(sessionId, history, hr);
+    } else {
+      console.warn("[llm] unknown sessionId", sessionId);
+    }
+  }
+
+  const text = await nextDateLine({
+    history,
+    latestSignal,
+    priorPatterns,
+    scenario,
+  });
+
+  if (sessionId) {
+    await insertTurn({
+      sessionId,
+      speaker: "ai",
+      text,
+      hrBaseline: hr.baseline,
+      hrAtTurn: hr.heartRate,
+      hrDelta: hr.delta,
+      flagged: Boolean(latestSignal),
+    });
+  }
+
+  console.log(
+    `[llm] session=${sessionId || "none"} signal=${latestSignal || "none"}`
+  );
+  writeSse(res, text);
+}
+
+// ElevenLabs Agent → Custom LLM (OpenAI-compatible SSE).
+// Agent dashboard URL: https://<host>/llm/chat/completions
+// Some agents POST /v1/chat/completions — we accept both.
+const chatHandler = asyncRoute(async (req, res) => {
+  try {
+    await handleChatCompletions(req, res);
+  } catch (err) {
+    console.error("[llm] webhook failed:", err);
+    if (!res.headersSent) {
+      writeSse(
+        res,
+        "You seem a little thrown — want to stay with that, or switch topics?"
+      );
+    }
+  }
 });
+
+llmWebhookRouter.post("/llm/chat/completions", chatHandler);
+llmWebhookRouter.post("/v1/chat/completions", chatHandler);

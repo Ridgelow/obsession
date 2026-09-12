@@ -1,6 +1,8 @@
 // Client for server/ (Gemini + Tiger Data + Backboard). Keys stay on the server.
+// Phase A Express listens on :8787. On a device, point this at ngrok:
+//   EXPO_PUBLIC_API_URL=https://YOUR_NGROK.ngrok.app
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8787";
 
 export async function startSession(userId: string, scenario = "first_date") {
   const res = await fetch(`${BASE_URL}/session/start`, {
@@ -33,7 +35,15 @@ export async function sendTelemetry(
 
 export async function getTimeline(sessionId: string) {
   const res = await fetch(`${BASE_URL}/session/${sessionId}/timeline`);
-  return res.json();
+  return res.json() as Promise<
+    Array<{
+      time: string;
+      speaker: string;
+      text: string;
+      hr_delta: number | null;
+      flagged: boolean;
+    }>
+  >;
 }
 
 export async function endSessionAndCoach(sessionId: string) {

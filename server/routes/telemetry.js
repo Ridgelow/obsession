@@ -1,41 +1,76 @@
 import { Router } from "express";
-import { pool } from "../db.js";
+import {
+  getLatestTelemetry,
+  getSession,
+  insertTelemetry,
+  listTurns,
+} from "../db.js";
+import { NERVES_THRESHOLD_BPM } from "../config.js";
+import { asyncRoute, formatElapsed, httpError } from "../util.js";
 
 export const telemetryRouter = Router();
 
-const NERVES_THRESHOLD_BPM = 12; // tune live during rehearsal
+function computeDelta(heartRate, baseline) {
+  if (baseline == null || !Number.isFinite(Number(baseline))) return 0;
+  return heartRate - Number(baseline);
+}
 
 // The mobile app calls this every couple of seconds with whatever the Presage
-// SDK/API just measured. This is the write side of Tiger Data.
-telemetryRouter.post("/session/:id/telemetry", async (req, res) => {
-  const { heartRate, breathingRate, engagement } = req.body;
-  const sessionId = req.params.id;
+// SDK (or the vitals simulator) just measured. Write side of Tiger Data.
+telemetryRouter.post(
+  "/session/:id/telemetry",
+  asyncRoute(async (req, res) => {
+    const heartRate = Number(req.body?.heartRate);
+    if (!Number.isFinite(heartRate)) {
+      throw httpError(400, "heartRate is required");
+    }
 
-  await pool.query(
-    `INSERT INTO telemetry (session_id, heart_rate, breathing_rate, engagement)
-     VALUES ($1, $2, $3, $4)`,
-    [sessionId, heartRate, breathingRate, engagement]
-  );
+    const sessionId = req.params.id;
+    const session = await getSession(sessionId);
+    if (!session) throw httpError(404, "session not found");
 
-  const { rows } = await pool.query(`SELECT hr_baseline FROM sessions WHERE id = $1`, [
-    sessionId,
-  ]);
-  const baseline = rows[0]?.hr_baseline;
-  const delta = baseline ? heartRate - baseline : 0;
-  const flagged = Math.abs(delta) >= NERVES_THRESHOLD_BPM;
+    const breathingRate =
+      req.body?.breathingRate == null ? null : Number(req.body.breathingRate);
+    const engagement =
+      req.body?.engagement == null ? null : Number(req.body.engagement);
+    const source = req.body?.source || "presage";
 
-  res.json({ delta: Math.round(delta), flagged });
-});
+    await insertTelemetry({
+      sessionId,
+      heartRate,
+      breathingRate: Number.isFinite(breathingRate) ? breathingRate : null,
+      engagement: Number.isFinite(engagement) ? engagement : null,
+      source,
+    });
 
-// Read side: powers the Results screen timeline. Returns the full telemetry +
-// conversation-turn series for a session, time-ordered, for the client to
-// render as the timeline dots and the flagged "key moment" callout.
-telemetryRouter.get("/session/:id/timeline", async (req, res) => {
-  const sessionId = req.params.id;
-  const turns = await pool.query(
-    `SELECT time, speaker, text, hr_delta, flagged FROM conversation_turns
-     WHERE session_id = $1 ORDER BY time ASC`,
-    [sessionId]
-  );
-  res.json({ turns: turns.rows });
-});
+    const delta = computeDelta(heartRate, session.hr_baseline);
+    const flagged = Math.abs(delta) >= NERVES_THRESHOLD_BPM;
+    res.json({ delta: Math.round(delta), flagged });
+  })
+);
+
+// Read side: Results timeline. Array of turns with time / speaker / text /
+// hr_delta / flagged — `time` is elapsed from session start (e.g. "0:42").
+telemetryRouter.get(
+  "/session/:id/timeline",
+  asyncRoute(async (req, res) => {
+    const session = await getSession(req.params.id);
+    if (!session) throw httpError(404, "session not found");
+
+    const turns = await listTurns(req.params.id);
+    const latest = await getLatestTelemetry(req.params.id);
+
+    res.json(
+      turns.map((turn) => ({
+        time: formatElapsed(session.started_at, turn.time),
+        speaker: turn.speaker,
+        text: turn.text,
+        hr_delta: turn.hr_delta == null ? null : Number(turn.hr_delta),
+        flagged: Boolean(turn.flagged),
+        // extras the client can ignore
+        at: turn.time,
+        latest_hr: latest?.heart_rate ?? null,
+      }))
+    );
+  })
+);

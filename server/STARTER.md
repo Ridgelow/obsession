@@ -1,8 +1,11 @@
 # Obsession — implementation starter
 
-Everything here is scaffold, not a finished build — API keys, an actual pg
-connection, and device testing are still yours to do. It's organized so you
-can hand each piece to a different person and have them not collide.
+Phase A (server brain) is implemented. Copy `.env.example` → `.env`, run
+`db/schema.sql` on Tiger Cloud, then `npm run dev`. Curl acceptance tests
+and the key table live in [README.md](./README.md).
+
+The notes below are the original architecture handoff so later phases
+(voice, vitals UI, Persona) do not invent a new stack.
 
 ## Architecture in one paragraph
 
