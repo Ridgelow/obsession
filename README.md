@@ -12,6 +12,7 @@ AI dating-conversation simulator/coach.
 | [`brand/`](brand/) | BRAND.md, tokens.css, app icon |
 | [`mockups/`](mockups/) | Screen references |
 | [`FRONTEND.md`](FRONTEND.md) | Frontend development plan |
+| [`TESTING.md`](TESTING.md) | Phone / demo testing requirements |
 
 ## Quick start (server brain — Phase A)
 
