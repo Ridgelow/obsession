@@ -38,7 +38,8 @@ async function backboardFetch(body) {
   const res = await fetch(`${baseUrl()}/threads/messages`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.BACKBOARD_API_KEY}`,
+      // Dashboard keys authenticate as X-API-Key (Bearer returns 401 session).
+      "X-API-Key": process.env.BACKBOARD_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
