@@ -5,6 +5,7 @@ export type VitalsReading = {
   heartRate: number;
   breathingRate?: number;
   engagement?: number;
+  source?: string;
 };
 
 export type VitalsSource = {
@@ -25,7 +26,12 @@ export function createVitalsSimulator(baseline = 71): VitalsSource {
       if (t >= 12) heartRate = baseline + 7;
       if (t >= 20) heartRate = baseline + 13;
       if (t >= 28) heartRate = baseline + 18;
-      return { heartRate, breathingRate: 14, engagement: 0.6 };
+      return {
+        heartRate,
+        breathingRate: 14,
+        engagement: 0.6,
+        source: "simulator",
+      };
     },
     reset() {
       t = 0;

@@ -57,6 +57,7 @@ function run(): void {
   assert(bare[0].flagged === false, "0 is not flagged");
 
   assert(normalizeTimeline(null).length === 0, "null timeline is empty");
+  assert(latestAiLine([]) === null, "empty timeline has no fake AI line");
 
   assert(
     isCoachResponse({

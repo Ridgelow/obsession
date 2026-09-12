@@ -34,6 +34,8 @@ export type TelemetryReading = {
   heartRate: number;
   breathingRate?: number;
   engagement?: number;
+  /** Server defaults to "presage" when omitted. Simulator must send "simulator". */
+  source?: string;
 };
 
 export type TelemetryResponse = {
