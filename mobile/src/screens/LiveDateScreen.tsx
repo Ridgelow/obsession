@@ -147,7 +147,7 @@ export function LiveDateScreen({ navigation, route }: Props) {
         return;
       }
 
-      sendTelemetry(sid, reading)
+      sendTelemetry(sid, { ...reading, source: "simulator" })
         .then((tel) => {
           if (endingRef.current) return;
           const nextDelta =
@@ -209,7 +209,8 @@ export function LiveDateScreen({ navigation, route }: Props) {
     }
     try {
       const coach = await endSessionAndCoach(sid);
-      if (coach.coaching) setLastMemory(coach.coaching);
+      // Do not cache coach.coaching — the full note overwrites the Home card.
+      // Home memory comes from the next startSession priorPatterns.
       markSessionComplete();
       navigation.replace("Results", {
         sessionId: sid,
@@ -226,7 +227,7 @@ export function LiveDateScreen({ navigation, route }: Props) {
           "Could not load coaching. Is Phase A running, and is EXPO_PUBLIC_API_URL set?",
       });
     }
-  }, [conversation, markSessionComplete, navigation, setLastMemory]);
+  }, [conversation, markSessionComplete, navigation]);
 
   const mm = String(Math.floor(seconds / 60));
   const ss = String(seconds % 60).padStart(2, "0");

@@ -81,6 +81,7 @@ export async function sendTelemetry(
       heartRate: reading.heartRate,
       breathingRate: reading.breathingRate ?? 14,
       engagement: reading.engagement ?? 0.6,
+      ...(reading.source ? { source: reading.source } : {}),
     }),
   });
   assertOk(res);
