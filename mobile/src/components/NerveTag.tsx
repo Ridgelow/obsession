@@ -17,7 +17,7 @@ export function NerveTag({
         {up ? "↑" : "↓"}
         {Math.abs(delta)}
       </Text>
-      <Text style={styles.meta}>BPM · NERVES {up ? "UP" : "DOWN"}</Text>
+      <Text style={styles.meta}>BPM · NERVES{up ? "↑" : "↓"}</Text>
     </View>
   );
 }
