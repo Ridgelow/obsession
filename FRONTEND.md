@@ -11,6 +11,17 @@ npm start
 
 Then open iOS Simulator, Android emulator, or Expo Go for UI-only work.
 
+**Phase E (Persona 18+) is not Expo Go.** Same prebuild / EAS **dev client** as Phase B:
+
+```bash
+npx expo prebuild --clean
+npx expo run:ios --device
+```
+
+Persona: `EXPO_PUBLIC_PERSONA_TEMPLATE_ID=persona_sandbox_2ccdba5e-08cd-4e47-965f-a59133988bb0`  
+Package: `react-native-persona` + Expo config plugin `plugins/withPersona.js` (Maven + iOS usage strings).  
+Continue unlocks only after `startVerification` → `onVerified`. Missing template id = labeled mock; set id without a native client = error, not a silent pass.
+
 **Phase B (voice + camera HR) is not Expo Go.** Use a prebuild / EAS dev client:
 
 ```bash
@@ -34,7 +45,7 @@ Presage: `EXPO_PUBLIC_PRESAGE_API_KEY` in `mobile/.env`. Simulator vitals are fa
 ### FE-2 — Screens with mock data (done / polish next)
 | Screen | Status | Owner later |
 |--------|--------|-------------|
-| Onboarding + Persona UI | Mock verify | Persona teammate |
+| Onboarding + Persona UI | `startVerification` + AsyncStorage | Persona teammate |
 | Home (Practice) | Mock memory + scenarios | Core B |
 | Live Date | Vitals simulator → NERVES↑ | Core A + B |
 | Results | Mock scores + timeline | Core B |
@@ -44,12 +55,12 @@ Presage: `EXPO_PUBLIC_PRESAGE_API_KEY` in `mobile/.env`. Simulator vitals are fa
 - [ ] Match mockup spacing/type sizes against `mockups/*.png`
 - [ ] Silhouette art / low-light photo instead of plain shape
 - [ ] Haptic on NERVES↑ (`expo-haptics`)
-- [ ] Persist `verified` with AsyncStorage
+- [x] Persist `verified` with AsyncStorage
 
 ### FE-3 — Wire real services (after FE-2 looks right)
 | Wire | File | Depends on |
 |------|------|------------|
-| Persona | `src/services/persona.ts` | Dev client + template ID |
+| Persona | `src/services/persona.ts` + `.native.ts` | Dev client + template ID (wired) |
 | Session create | `src/services/api.ts` | Express server up |
 | ElevenLabs | `src/services/elevenlabs.ts` + `.native.ts` | Agent id env + Custom LLM URL (Hasnain) |
 | Presage camera | `src/services/presage.ts` + `modules/smart-spectra` | Real HR; simulator only if native/key fails |

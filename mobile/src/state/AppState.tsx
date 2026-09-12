@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import { persistVerified } from "../services/verifiedStorage";
 
 export type Scenario = "First Date" | "Coffee Chat" | "Silence";
 
@@ -13,7 +14,7 @@ const FALLBACK_MEMORY =
 
 type AppState = {
   verified: boolean;
-  setVerified: (v: boolean) => void;
+  setVerified: (v: boolean, inquiryId?: string) => void;
   sessionCount: number;
   bumpSessionCount: () => void;
   scenario: Scenario;
@@ -28,13 +29,27 @@ type AppState = {
 
 const Ctx = createContext<AppState | null>(null);
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [verified, setVerified] = useState(false);
+export function AppProvider({
+  children,
+  initialVerified = false,
+}: {
+  children: React.ReactNode;
+  initialVerified?: boolean;
+}) {
+  const [verified, setVerifiedState] = useState(initialVerified);
   const [scenario, setScenario] = useState<Scenario>("First Date");
   const [lastMemory, setLastMemory] = useState(FALLBACK_MEMORY);
   const [sessionCount, setSessionCount] = useState(4);
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [recallNonce, setRecallNonce] = useState(0);
+
+  const setVerified = useCallback((v: boolean, inquiryId?: string) => {
+    setVerifiedState(v);
+    void persistVerified({
+      verified: v,
+      inquiryId: v ? inquiryId : undefined,
+    });
+  }, []);
 
   const bumpSessionCount = useCallback(() => {
     setSessionCount((n) => n + 1);
@@ -62,6 +77,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       verified,
+      setVerified,
       scenario,
       lastMemory,
       sessionCount,
