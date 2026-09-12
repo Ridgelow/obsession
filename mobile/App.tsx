@@ -1,0 +1,65 @@
+import { StatusBar } from "expo-status-bar";
+import { ActivityIndicator, View } from "react-native";
+import { NavigationContainer, DarkTheme } from "@react-navigation/native";
+import {
+  useFonts,
+  BodoniModa_700Bold,
+  BodoniModa_400Regular_Italic,
+} from "@expo-google-fonts/bodoni-moda";
+import {
+  Manrope_400Regular,
+  Manrope_500Medium,
+  Manrope_700Bold,
+} from "@expo-google-fonts/manrope";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AppProvider } from "./src/state/AppState";
+import { RootNavigator } from "./src/navigation/RootNavigator";
+import { colors } from "./src/theme";
+
+const navTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: colors.void,
+    card: colors.void,
+    text: colors.bone,
+    border: colors.line,
+    primary: colors.pulse,
+  },
+};
+
+export default function App() {
+  const [loaded] = useFonts({
+    BodoniModa_700Bold,
+    BodoniModa_400Regular_Italic,
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_700Bold,
+  });
+
+  if (!loaded) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.void,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <ActivityIndicator color={colors.pulse} />
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaProvider>
+      <AppProvider>
+        <NavigationContainer theme={navTheme}>
+          <StatusBar style="light" />
+          <RootNavigator />
+        </NavigationContainer>
+      </AppProvider>
+    </SafeAreaProvider>
+  );
+}

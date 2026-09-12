@@ -1,0 +1,113 @@
+/* ==========================================================================
+   OBSESSION — Design Tokens
+   Import this file, then use the CSS custom properties + utility classes
+   below anywhere in the app.
+   ========================================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+:root {
+  /* Color — oklch, two accents share chroma/lightness, vary only hue */
+  --ob-void:  oklch(14% 0.012 30);   /* primary background */
+  --ob-ink:   oklch(9%  0.010 20);   /* deep panels / cards on void */
+  --ob-bone:  oklch(96% 0.008 75);   /* primary text / reversed bg */
+  --ob-muted: oklch(70% 0.010 60);   /* secondary text / labels */
+  --ob-line:  oklch(28% 0.010 30);   /* hairlines / borders */
+  --ob-pulse: oklch(60% 0.180 25);   /* red accent — alerts, key moments */
+  --ob-hush:  oklch(60% 0.180 340);  /* pink accent — secondary highlight */
+
+  /* Type */
+  --ob-font-display: "Bodoni Moda", "Didot", Georgia, serif;
+  --ob-font-body: "Manrope", -apple-system, "Helvetica Neue", Arial, sans-serif;
+
+  /* Radii / rhythm */
+  --ob-radius-sm: 6px;
+  --ob-radius-md: 12px;
+  --ob-radius-pill: 999px;
+}
+
+/* ---- Base ---- */
+body.ob-theme {
+  background: var(--ob-void);
+  color: var(--ob-bone);
+  font-family: var(--ob-font-body);
+}
+.ob-theme a { color: var(--ob-pulse); }
+.ob-theme a:hover { color: oklch(70% 0.18 25); }
+.ob-theme ::selection { background: var(--ob-pulse); color: var(--ob-void); }
+
+/* ---- Wordmark ---- */
+.ob-wordmark {
+  font-family: var(--ob-font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 0.92;
+}
+.ob-wordmark--hero { font-size: 176px; }
+.ob-wordmark--lockup { font-size: 52px; }
+.ob-wordmark--nav { font-size: 15px; letter-spacing: 0.04em; }
+
+/* ---- Tagline / AI speech ---- */
+.ob-tagline {
+  font-family: var(--ob-font-display);
+  font-style: italic;
+  font-weight: 400;
+  color: oklch(85% 0.02 40);
+}
+
+/* ---- Section / eyebrow labels ---- */
+.ob-eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ob-muted);
+}
+
+/* ---- Signature physiological readout tag ---- */
+.ob-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--ob-ink);
+  border: 1px solid oklch(60% 0.18 25 / 0.5);
+  border-radius: var(--ob-radius-sm);
+  padding: 8px 16px;
+  font-family: var(--ob-font-body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.ob-tag__delta { color: var(--ob-pulse); }
+
+/* ---- Category pill (Chemistry / Conversation / Composure / Curiosity) ---- */
+.ob-pill {
+  padding: 10px 20px;
+  border-radius: var(--ob-radius-pill);
+  border: 1px solid oklch(34% 0.02 30);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: oklch(85% 0.01 60);
+  text-align: center;
+}
+
+/* ---- Card / panel ---- */
+.ob-card {
+  background: var(--ob-ink);
+  border: 1px solid var(--ob-line);
+  border-radius: var(--ob-radius-md);
+  padding: 28px;
+}
+
+/* ---- Chat bubble (AI line) ---- */
+.ob-bubble {
+  background: oklch(13% 0.012 30 / 0.85);
+  border: 1px solid oklch(30% 0.02 30);
+  border-radius: 16px 16px 16px 4px;
+  padding: 16px 18px;
+  font-family: var(--ob-font-display);
+  font-style: italic;
+  font-size: 16px;
+  line-height: 1.4;
+}

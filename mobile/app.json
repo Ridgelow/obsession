@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Obsession",
+    "slug": "obsession",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0e0707"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.obsession.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Obsession uses the camera for Presage heart-rate sensing during practice dates.",
+        "NSMicrophoneUsageDescription": "Obsession uses the microphone for voice practice dates."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0e0707",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "package": "com.obsession.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
