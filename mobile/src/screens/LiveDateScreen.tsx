@@ -65,16 +65,14 @@ export function LiveDateScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    const scenarioKey = mapScenario(route.params?.scenario ?? scenario);
     (async () => {
       if (sessionIdRef.current) {
         bumpSessionCount();
         return;
       }
       try {
-        const res = await startSession(
-          DEMO_USER_ID,
-          mapScenario(route.params?.scenario ?? scenario)
-        );
+        const res = await startSession(DEMO_USER_ID, scenarioKey);
         if (cancelled) return;
         sessionIdRef.current = res.sessionId;
         setSessionId(res.sessionId);
@@ -89,7 +87,9 @@ export function LiveDateScreen({ navigation, route }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [bumpSessionCount, route.params?.scenario, scenario, setLastMemory]);
+    // One session per LiveDate mount — do not restart when AppState identity shifts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!sessionId) return;

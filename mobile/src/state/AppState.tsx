@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 
 export type Scenario = "First Date" | "Coffee Chat" | "Silence";
 
@@ -30,12 +36,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [recallNonce, setRecallNonce] = useState(0);
 
+  const bumpSessionCount = useCallback(() => {
+    setSessionCount((n) => n + 1);
+  }, []);
+
+  const markSessionComplete = useCallback(() => {
+    setPendingSessionId(null);
+    setRecallNonce((n) => n + 1);
+  }, []);
+
   const value = useMemo(
     () => ({
       verified,
       setVerified,
       sessionCount,
-      bumpSessionCount: () => setSessionCount((n) => n + 1),
+      bumpSessionCount,
       scenario,
       setScenario,
       lastMemory,
@@ -43,12 +58,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pendingSessionId,
       setPendingSessionId,
       recallNonce,
-      markSessionComplete: () => {
-        setPendingSessionId(null);
-        setRecallNonce((n) => n + 1);
-      },
+      markSessionComplete,
     }),
-    [verified, scenario, lastMemory, sessionCount, pendingSessionId, recallNonce]
+    [
+      verified,
+      scenario,
+      lastMemory,
+      sessionCount,
+      pendingSessionId,
+      recallNonce,
+      bumpSessionCount,
+      markSessionComplete,
+    ]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
