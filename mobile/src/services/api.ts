@@ -29,15 +29,28 @@ export function getApiBaseUrl(): string {
   return BASE_URL;
 }
 
-async function request(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(`${BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+const DEFAULT_TIMEOUT_MS = 8_000;
+
+async function request(
+  path: string,
+  init?: RequestInit & { timeoutMs?: number }
+): Promise<Response> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchInit } = init ?? {};
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(`${BASE_URL}${path}`, {
+      ...fetchInit,
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(fetchInit.headers ?? {}),
+      },
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function assertOk(res: Response): void {
@@ -129,20 +142,52 @@ export async function endSession(sessionId: string): Promise<void> {
   if (res.status !== 204) assertOk(res);
 }
 
+export type TranscriptTurnInput = {
+  speaker: "user" | "ai" | "agent";
+  text: string;
+};
+
+/** POST /session/:id/turns — sync live voice transcript into Tiger. */
+export async function uploadTurns(
+  sessionId: string,
+  turns: TranscriptTurnInput[]
+): Promise<{ inserted: number }> {
+  const res = await request(`/session/${sessionId}/turns`, {
+    method: "POST",
+    body: JSON.stringify({ turns }),
+  });
+  assertOk(res);
+  return res.json() as Promise<{ inserted: number }>;
+}
+
 /** POST /session/:id/coach → { scores, keyMoment, coaching } */
-export async function coachSession(sessionId: string): Promise<CoachResponse> {
-  const res = await request(`/session/${sessionId}/coach`, { method: "POST" });
+export async function coachSession(
+  sessionId: string,
+  turns?: TranscriptTurnInput[]
+): Promise<CoachResponse> {
+  const res = await request(`/session/${sessionId}/coach`, {
+    method: "POST",
+    body: JSON.stringify(turns?.length ? { turns } : {}),
+  });
   assertOk(res);
   return res.json() as Promise<CoachResponse>;
 }
 
 export async function endSessionAndCoach(
-  sessionId: string
+  sessionId: string,
+  turns?: TranscriptTurnInput[]
 ): Promise<CoachResponse> {
+  if (turns?.length) {
+    try {
+      await uploadTurns(sessionId, turns);
+    } catch {
+      // Coach endpoint also accepts turns as a fallback.
+    }
+  }
   try {
     await endSession(sessionId);
   } catch {
     // Still try coach — the session may already be marked ended.
   }
-  return coachSession(sessionId);
+  return coachSession(sessionId, turns);
 }

@@ -3,13 +3,26 @@
 export type VoiceSessionConfig = {
   agentId: string;
   dynamicVariables: { session_id: string };
-  customLlmExtraBody: { sessionId: string };
+  /**
+   * Only sent when the agent allows it
+   * (`platform_settings.overrides.custom_llm_extra_body`).
+   * Session id is also in dynamicVariables for the webhook.
+   */
+  customLlmExtraBody?: { sessionId: string };
 };
 
 export type DateConversationStatus =
   | "connected"
   | "connecting"
   | "disconnected";
+
+export type TranscriptRole = "agent" | "user";
+
+export type TranscriptEntry = {
+  id: string;
+  role: TranscriptRole;
+  text: string;
+};
 
 export type DateConversation = {
   start: () => Promise<void>;
@@ -18,7 +31,11 @@ export type DateConversation = {
   status: DateConversationStatus;
   lastAgentLine: string | null;
   lastUserLine: string | null;
+  /** Full live transcript for the date screen. */
+  transcript: TranscriptEntry[];
   configured: boolean;
+  /** Inject a [SIGNAL:…] note into the live agent (hosted LLM path). */
+  sendSignal?: (signal: string) => void;
 };
 
 export function voiceAgentId(): string {
@@ -30,18 +47,15 @@ export function isVoiceConfigured(): boolean {
 }
 
 /**
- * Session overrides for the Custom LLM webhook (Phase A).
- * Server resolveSessionId reads:
- *   elevenlabs_extra_body.sessionId | custom_llm_extra_body.sessionId
- *   | dynamic_variables.session_id
- * This SDK version sends customLlmExtraBody → custom_llm_extra_body
- * and dynamicVariables → dynamic_variables.
+ * Session config for the ElevenLabs agent.
+ * Prefer dynamicVariables.session_id only — customLlmExtraBody is only valid
+ * when the agent llm is `custom-llm` AND overrides.custom_llm_extra_body is on.
+ * Hosted Gemini agents reject/ignore extra body; keep the payload minimal.
  */
 export function buildVoiceSessionConfig(sessionId: string): VoiceSessionConfig {
   return {
     agentId: voiceAgentId(),
     dynamicVariables: { session_id: sessionId },
-    customLlmExtraBody: { sessionId },
   };
 }
 
@@ -62,7 +76,7 @@ function messageTextFromPayload(payload: Record<string, unknown>): string | null
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function roleFromPayload(payload: Record<string, unknown>): "agent" | "user" | null {
+function roleFromPayload(payload: Record<string, unknown>): TranscriptRole | null {
   const role = String(payload.role ?? "").toLowerCase();
   const source = String(payload.source ?? "").toLowerCase();
   if (
@@ -98,6 +112,56 @@ export function extractUserSpokenLine(payload: unknown): string | null {
   return messageTextFromPayload(p);
 }
 
+/** Append a turn, skipping exact consecutive duplicates. */
+export function appendTranscriptEntry(
+  prev: TranscriptEntry[],
+  role: TranscriptRole,
+  text: string
+): TranscriptEntry[] {
+  const trimmed = text.trim();
+  if (!trimmed) return prev;
+  const last = prev[prev.length - 1];
+  if (last && last.role === role && last.text === trimmed) return prev;
+  return [
+    ...prev,
+    {
+      id: `${role}-${Date.now()}-${prev.length}`,
+      role,
+      text: trimmed,
+    },
+  ];
+}
+
+/**
+ * Pull transcript text from raw LiveKit / ElevenLabs client events
+ * (user_transcript / agent_response) when onMessage is quiet.
+ */
+export function extractFromIncomingEvent(
+  event: unknown
+): { role: TranscriptRole; text: string } | null {
+  if (event == null || typeof event !== "object") return null;
+  const e = event as Record<string, unknown>;
+  const type = String(e.type ?? "");
+
+  if (type === "user_transcript") {
+    const ute = e.user_transcription_event as Record<string, unknown> | undefined;
+    const text = ute?.user_transcript ?? e.user_transcript;
+    if (typeof text === "string" && text.trim()) {
+      return { role: "user", text: text.trim() };
+    }
+  }
+
+  if (type === "agent_response") {
+    const are = e.agent_response_event as Record<string, unknown> | undefined;
+    const text = are?.agent_response ?? e.agent_response;
+    if (typeof text === "string" && text.trim()) {
+      return { role: "agent", text: text.trim() };
+    }
+  }
+
+  return null;
+}
+
 export const STUB_CONVERSATION: DateConversation = {
   start: async () => undefined,
   stop: async () => undefined,
@@ -105,5 +169,7 @@ export const STUB_CONVERSATION: DateConversation = {
   status: "disconnected",
   lastAgentLine: null,
   lastUserLine: null,
+  transcript: [],
   configured: false,
+  sendSignal: () => undefined,
 };

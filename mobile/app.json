@@ -41,13 +41,15 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-camera",
       "@config-plugins/react-native-webrtc",
       "@livekit/react-native-expo-plugin",
       [
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "17.0"
+            "deploymentTarget": "17.0",
+            "useFrameworks": "dynamic"
           },
           "android": {
             "minSdkVersion": 28,

@@ -1,3 +1,4 @@
+import type { ComponentType } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,6 +9,7 @@ import { HomeScreen } from "../screens/HomeScreen";
 import { HistoryScreen } from "../screens/HistoryScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
 import { ResultsScreen } from "../screens/ResultsScreen";
+import { LiveDateScreen } from "../screens/LiveDateScreen";
 import { colors, fonts, type } from "../theme";
 import { useAppState } from "../state/AppState";
 
@@ -72,11 +74,7 @@ export function RootNavigator() {
       <Stack.Screen name="Main" component={MainTabs} />
       <Stack.Screen
         name="LiveDate"
-        // Lazy: avoid loading LiveKit/ElevenLabs native modules at boot
-        // (that was crashing with "runtime not ready").
-        getComponent={() =>
-          require("../screens/LiveDateScreen").LiveDateScreen
-        }
+        component={LiveDateScreen as ComponentType}
         options={{ animation: "slide_from_bottom", gestureEnabled: false }}
       />
       <Stack.Screen

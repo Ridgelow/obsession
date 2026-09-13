@@ -21,7 +21,7 @@ Pod::Spec.new do |s|
     'SWIFT_COMPILATION_MODE' => 'wholemodule'
   }
 
-  # SmartSpectra SPM is intentionally NOT linked here for now.
-  # Linking it via CocoaPods SPM + static frameworks crashed the app at launch.
-  # Demo uses the HR simulator; re-add SPM when using USE_FRAMEWORKS=dynamic.
+  # SmartSpectra is linked via SPM on the app target (dynamic frameworks).
+  # Do not declare it as a CocoaPods SPM dependency here — that path crashed
+  # under static frameworks. See modules/smart-spectra/app.plugin.js.
 end

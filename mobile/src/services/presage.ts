@@ -36,9 +36,37 @@ export type LiveVitals = {
   hint: string | null;
   /** Latest HR. Null while the camera is warming — do not invent a reading. */
   latest(): VitalsReading | null;
+  /** Base64 JPEG from SmartSpectra when image output is enabled. */
+  latestPreviewJpegBase64(): string | null;
   reset(): void;
   stop(): Promise<void>;
 };
+
+/** Serialize SmartSpectra start/stop so date #2 never overlaps date #1 teardown. */
+let vitalsGate: Promise<void> = Promise.resolve();
+
+function enqueueVitals<T>(fn: () => Promise<T>): Promise<T> {
+  const run = vitalsGate.then(fn, fn);
+  vitalsGate = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
+
+/** Wait until any in-flight Presage start/stop finishes, then force-stop. */
+export async function ensurePresageStopped(): Promise<void> {
+  await enqueueVitals(async () => {
+    const native = getNativeSmartSpectra();
+    if (!native?.stop) return;
+    try {
+      await native.stop();
+    } catch {
+      // nothing running
+    }
+  });
+  await new Promise((r) => setTimeout(r, 300));
+}
 
 function wrapSimulator(reason: VitalsFallbackReason): LiveVitals {
   const sim = createVitalsSimulator();
@@ -48,6 +76,9 @@ function wrapSimulator(reason: VitalsFallbackReason): LiveVitals {
     hint: vitalsFallbackHint(reason),
     latest() {
       return sim.tick();
+    },
+    latestPreviewJpegBase64() {
+      return null;
     },
     reset() {
       sim.reset();
@@ -79,39 +110,66 @@ export async function openVitalsSource(): Promise<LiveVitals> {
   const key = presageApiKey();
   if (!key) return wrapSimulator("missing_key");
 
+  // Native SmartSpectra SPM currently crashes the app if linked; keep simulator
+  // unless explicitly opted in after a proper dynamic-frameworks rebuild.
+  const allowNative =
+    (process.env.EXPO_PUBLIC_PRESAGE_USE_NATIVE ?? "").trim() === "1";
+  if (!allowNative) return wrapSimulator("native_unavailable");
+
   const native = getNativeSmartSpectra();
   if (!native) return wrapSimulator("native_unavailable");
 
   try {
     await requestCameraPermission();
-    await native.start(key);
+    await enqueueVitals(async () => {
+      try {
+        await native.stop();
+      } catch {
+        // nothing running
+      }
+      await native.start(key);
+    });
     return {
       kind: "presage",
       fallbackReason: null,
       hint: "Camera HR live",
       latest() {
         const reading = native.latestReading();
-        if (
-          !reading ||
-          !Number.isFinite(reading.heartRate) ||
-          reading.heartRate <= 0
-        ) {
-          return null;
-        }
+        if (!reading) return null;
+        const hrRaw = reading.heartRate;
+        const heartRate =
+          typeof hrRaw === "number" && Number.isFinite(hrRaw) && hrRaw > 0
+            ? Math.round(hrRaw)
+            : 0;
         return {
-          heartRate: Math.round(reading.heartRate),
+          heartRate,
           breathingRate: reading.breathingRate,
           engagement: reading.engagement ?? 0.6,
-          source: "presage",
+          expression:
+            typeof reading.expression === "string" && reading.expression
+              ? reading.expression
+              : undefined,
+          expressionConfidence: reading.expressionConfidence,
+          talking: Boolean(reading.talking),
+          source: "presage" as const,
         };
+      },
+      latestPreviewJpegBase64() {
+        try {
+          return native.latestPreviewJpegBase64?.() ?? null;
+        } catch {
+          return null;
+        }
       },
       reset() {},
       async stop() {
-        try {
-          await native.stop();
-        } catch {
-          // Camera already torn down.
-        }
+        await enqueueVitals(async () => {
+          try {
+            await native.stop();
+          } catch {
+            // Camera already torn down.
+          }
+        });
       },
     };
   } catch (err) {

@@ -7,7 +7,7 @@ export const NERVES_THRESHOLD_BPM = Number(
   process.env.NERVES_THRESHOLD_BPM || 12
 );
 
-export const GEMINI_MODEL = "gemini-3.6-flash";
+export const GEMINI_MODEL = "gemini-3.5-flash";
 
 export function hasGeminiKey() {
   return Boolean(process.env.GEMINI_API_KEY);

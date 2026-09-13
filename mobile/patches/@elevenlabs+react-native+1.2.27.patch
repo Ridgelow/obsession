@@ -1,0 +1,65 @@
+diff --git a/node_modules/@elevenlabs/react-native/dist/index.react-native.js b/node_modules/@elevenlabs/react-native/dist/index.react-native.js
+index 77914f3..cb155e2 100644
+--- a/node_modules/@elevenlabs/react-native/dist/index.react-native.js
++++ b/node_modules/@elevenlabs/react-native/dist/index.react-native.js
+@@ -4,17 +4,27 @@ import { attachNativeVolume } from "./nativeVolume.js";
+ // Polyfill WebRTC globals needed by livekit-client in React Native
+ registerGlobals();
+ /**
+- * React Native voice session setup strategy.
+- *
+- * 1. Configures and starts the native AudioSession
+- * 2. Creates a WebRTC connection and extracts its I/O controllers
+- * 3. Wraps input/output controllers with native volume processors
+- * 4. Wraps detach to stop the native AudioSession on cleanup
+- *
+- * Only WebRTC connections are supported on React Native.
+- * WebSocket connections require Web Audio APIs (AudioContext,
+- * AudioWorkletNode) that are not available in React Native.
++ * Obsession patch (device-proven 2026-09-12):
++ * Date #2 publishes an unmuted mic at WebRTC audioLevel 0. Retry
++ * startAudioSession when iOS returns "Session activation failed".
++ * Always stop AudioSession on detach so the next date can fully re-init ADM.
+  */
++async function startAudioSessionWithRetry() {
++    try {
++        await AudioSession.startAudioSession();
++    }
++    catch (first) {
++        console.warn("[elevenlabs-rn] startAudioSession failed — retry", first);
++        try {
++            await AudioSession.stopAudioSession();
++        }
++        catch {
++            // ok
++        }
++        await new Promise((r) => setTimeout(r, 700));
++        await AudioSession.startAudioSession();
++    }
++}
+ async function reactNativeSessionSetup(options) {
+     if (options.connectionType === "websocket" || options.signedUrl) {
+         throw new Error("WebSocket connections are not supported on React Native. " +
+@@ -30,7 +40,7 @@ async function reactNativeSessionSetup(options) {
+             defaultOutput: "speaker",
+         },
+     });
+-    await AudioSession.startAudioSession();
++    await startAudioSessionWithRetry();
+     const connection = await createConnection(options);
+     const result = attachNativeVolume(setupWebRTCSession(connection));
+     const originalDetach = result.detach;
+@@ -41,7 +51,12 @@ async function reactNativeSessionSetup(options) {
+                 await originalDetach();
+             }
+             finally {
+-                await AudioSession.stopAudioSession();
++                try {
++                    await AudioSession.stopAudioSession();
++                }
++                catch {
++                    // ok
++                }
+             }
+         },
+     };

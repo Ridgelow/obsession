@@ -4,12 +4,42 @@ export type NativeVitalsReading = {
   heartRate: number;
   breathingRate?: number;
   engagement?: number;
+  expression?: string;
+  expressionConfidence?: number;
+  talking?: boolean;
+};
+
+export type MicCaptureRegressionVerdict = {
+  cold_capture_ok: boolean;
+  after_presage_capture_ok: boolean;
+  after_hardReset_capture_ok: boolean;
+  presage_killed_capture: boolean;
+  hardReset_killed_capture: boolean;
+  threshold: number;
+};
+
+export type MicCaptureRegressionReport = {
+  t0_rms?: number;
+  after_presage_rms?: number;
+  after_hardReset_rms?: number;
+  presage_error?: string;
+  verdict?: MicCaptureRegressionVerdict;
+  [key: string]: unknown;
 };
 
 export type NativeSmartSpectra = {
   start(apiKey: string): Promise<void>;
   stop(): Promise<void>;
   latestReading(): NativeVitalsReading | null;
+  latestPreviewJpegBase64?: () => string | null;
+  /** Hard AVAudioSession deactivate/activate — clears silent-mic after date #1. */
+  resetAudioSession?: () => Promise<void>;
+  /** Deactivate only — clear stuck activation before LiveKit startAudioSession. */
+  deactivateAudioSession?: () => Promise<void>;
+  /** Device A/B: capture RMS before/after Presage + hardReset. */
+  runMicCaptureRegression?: (
+    apiKey: string
+  ) => Promise<MicCaptureRegressionReport>;
 };
 
 /**

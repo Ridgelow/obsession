@@ -20,6 +20,14 @@ export const EMPTY_PROFILE: UserProfile = {
 
 export const PROFILE_STORAGE_KEY = "obsession.profile";
 
+/** Practice-date partner — always shown as Nikki in the product UI. */
+export const DATE_PARTNER_NAME = "Nikki";
+
+export function displayUserName(profile: UserProfile | null | undefined): string {
+  const name = profile?.name?.trim();
+  return name && name.length > 0 ? name : "You";
+}
+
 export function isProfileComplete(profile: UserProfile): boolean {
   return (
     profile.name.trim().length > 0 &&
@@ -38,13 +46,16 @@ export async function loadProfile(): Promise<UserProfile> {
     if (!parsed || typeof parsed !== "object") return EMPTY_PROFILE;
     return {
       name: typeof parsed.name === "string" ? parsed.name : "",
-      dateOfBirth: typeof parsed.dateOfBirth === "string" ? parsed.dateOfBirth : "",
+      dateOfBirth:
+        typeof parsed.dateOfBirth === "string" ? parsed.dateOfBirth : "",
       gender: typeof parsed.gender === "string" ? parsed.gender : "",
       goals: Array.isArray(parsed.goals)
         ? parsed.goals.filter((g): g is string => typeof g === "string")
         : [],
-      datesRange: typeof parsed.datesRange === "string" ? parsed.datesRange : "",
-      hadPartner: typeof parsed.hadPartner === "string" ? parsed.hadPartner : "",
+      datesRange:
+        typeof parsed.datesRange === "string" ? parsed.datesRange : "",
+      hadPartner:
+        typeof parsed.hadPartner === "string" ? parsed.hadPartner : "",
     };
   } catch {
     return EMPTY_PROFILE;

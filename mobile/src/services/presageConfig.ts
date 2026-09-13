@@ -7,9 +7,14 @@ export type VitalsFallbackReason =
   | null;
 
 export type VitalsReading = {
+  /** 0 while SmartSpectra is still locking pulse. */
   heartRate: number;
   breathingRate?: number;
   engagement?: number;
+  /** Dominant facial expression label from SmartSpectra (e.g. smiling, nervous). */
+  expression?: string;
+  expressionConfidence?: number;
+  talking?: boolean;
   source: VitalsKind;
 };
 
@@ -26,14 +31,19 @@ export function isPresageConfigured(): boolean {
   return presageApiKey().length > 0;
 }
 
+/** True when the build opts into SmartSpectra (mutually exclusive with expo-camera). */
+export function preferNativePresage(): boolean {
+  return (process.env.EXPO_PUBLIC_PRESAGE_USE_NATIVE ?? "").trim() === "1";
+}
+
 export function vitalsFallbackHint(reason: VitalsFallbackReason): string | null {
   switch (reason) {
     case "missing_key":
-      return "Demo HR — add EXPO_PUBLIC_PRESAGE_API_KEY for camera vitals.";
+      return "Demo HR — camera preview still on.";
     case "native_unavailable":
-      return "Demo HR (simulated) — camera vitals need SmartSpectra linked.";
+      return "Demo HR (simulated) — face the camera for the date vibe.";
     case "native_failed":
-      return "Demo HR (simulated) — camera vitals unavailable this build.";
+      return "Demo HR (simulated) — camera preview still on.";
     default:
       return null;
   }

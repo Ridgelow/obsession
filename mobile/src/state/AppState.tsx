@@ -24,8 +24,10 @@ import {
   persistProfile,
   type UserProfile,
 } from "../services/profileStorage";
+import type { Personality, Scenario } from "../services/practiceOptions";
 
-export type Scenario = "First Date" | "Coffee Chat" | "Silence";
+export type { Scenario } from "../services/practiceOptions";
+export type { Personality } from "../services/practiceOptions";
 
 type AppState = {
   verified: boolean;
@@ -37,6 +39,8 @@ type AppState = {
   bumpSessionCount: () => void;
   scenario: Scenario;
   setScenario: (s: Scenario) => void;
+  personality: Personality;
+  setPersonality: (p: Personality) => void;
   lastMemory: string;
   setLastMemory: (m: string) => void;
   pendingSessionId: string | null;
@@ -48,9 +52,11 @@ type AppState = {
   addHistoryEntry: (input: {
     sessionId?: string;
     scenario: string;
+    personality?: string;
     scores?: CoachScores;
     keyMoment?: string;
     coaching?: string;
+    turns?: { speaker: "user" | "ai"; text: string }[];
   }) => void;
 };
 
@@ -68,6 +74,7 @@ export function AppProvider({
   const [verified, setVerifiedState] = useState(initialVerified);
   const [profile, setProfileState] = useState<UserProfile>(initialProfile);
   const [scenario, setScenario] = useState<Scenario>("First Date");
+  const [personality, setPersonality] = useState<Personality>("Warm");
   const [lastMemory, setLastMemoryState] = useState(FALLBACK_LAST_MEMORY);
   const [sessionCount, setSessionCount] = useState(4);
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
@@ -125,9 +132,11 @@ export function AppProvider({
     (input: {
       sessionId?: string;
       scenario: string;
+      personality?: string;
       scores?: CoachScores;
       keyMoment?: string;
       coaching?: string;
+      turns?: { speaker: "user" | "ai"; text: string }[];
     }) => {
       const entry = buildHistoryEntry(input);
       setHistory((prev) => {
@@ -155,6 +164,8 @@ export function AppProvider({
       bumpSessionCount,
       scenario,
       setScenario,
+      personality,
+      setPersonality,
       lastMemory,
       setLastMemory,
       pendingSessionId,
@@ -173,6 +184,7 @@ export function AppProvider({
       setProfile,
       setLastMemory,
       scenario,
+      personality,
       lastMemory,
       sessionCount,
       pendingSessionId,

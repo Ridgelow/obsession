@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getSession, listTurns, updateSession } from "../db.js";
+import { getSession, insertTurn, listTurns, updateSession } from "../db.js";
 import { coachSession } from "../gemini.js";
 import { rememberSession } from "../backboard.js";
 import { asyncRoute, formatElapsed, httpError } from "../util.js";
@@ -16,12 +16,20 @@ function buildTranscript(turns, startedAt) {
           : t.flagged
             ? "[HR SPIKE] "
             : "";
-      return `${stamp} ${spike}${t.speaker}: ${t.text}`;
+      const who =
+        t.speaker === "ai" || t.speaker === "agent"
+          ? "Nikki"
+          : t.speaker === "user"
+            ? "You"
+            : t.speaker;
+      return `${stamp} ${spike}${who}: ${t.text}`;
     })
     .join("\n");
 }
 
 // Called when the date ends, right before the Results screen loads.
+// Optional body.turns lets the mobile client ship the live voice transcript
+// when Custom LLM isn't logging turns (hosted Gemini path).
 coachingRouter.post(
   "/session/:id/coach",
   asyncRoute(async (req, res) => {
@@ -29,8 +37,21 @@ coachingRouter.post(
     const session = await getSession(sessionId);
     if (!session) throw httpError(404, "session not found");
 
+    const raw = Array.isArray(req.body?.turns) ? req.body.turns : [];
+    for (const row of raw) {
+      const text = String(row?.text ?? "").trim();
+      if (!text) continue;
+      const role = String(row?.speaker ?? row?.role ?? "").toLowerCase();
+      const speaker =
+        role === "user" || role === "you" ? "user" : "ai";
+      await insertTurn({ sessionId, speaker, text });
+    }
+
     const turns = await listTurns(sessionId);
     const transcriptWithSignals = buildTranscript(turns, session.started_at);
+    console.log(
+      `[coach] session=${sessionId} turns=${turns.length} chars=${transcriptWithSignals.length}`
+    );
     const result = await coachSession({ transcriptWithSignals });
 
     await updateSession(sessionId, {
